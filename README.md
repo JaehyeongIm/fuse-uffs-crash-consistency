@@ -1,159 +1,144 @@
-libfuse
-=======
+# FUSE를 활용한 uffs 파일 시스템 구현
 
-About
------
+### Members
+|Jae-hyeong|Sung-woon|byeong-hyeon|
+|:-:|:-:|:-:|
+|<img src="https://github.com/user-attachments/assets/ef510219-2286-4048-9810-505ca2b5d5e6" alt="jae-hyeong" width="100" height="100">|<img src="https://github.com/user-attachments/assets/b9478ab7-b1b6-4313-bbc8-38e195364dde" alt="dingwoonee" width="100" height="100">|<img src="https://github.com/user-attachments/assets/d75b48a4-c3bb-4280-be3c-e0fbf4ea8464" alt="dingwoonee" width="100" height="100">|
+|[JaehyeongIm](https://github.com/JaehyeongIm)|[DingWoonee](https://github.com/DingWoonee)|[bangbang444](https://github.com/bangbang444)|
 
-FUSE (Filesystem in Userspace) is an interface for userspace programs
-to export a filesystem to the Linux kernel. The FUSE project consists
-of two components: the *fuse* kernel module (maintained in the regular
-kernel repositories) and the *libfuse* userspace library (maintained
-in this repository). libfuse provides the reference implementation
-for communicating with the FUSE kernel module.
+### Technologies Used
+<img src="https://img.shields.io/badge/C-00599C?style=flat-square&logo=C%2B%2B&logoColor=white"/> <img src="https://img.shields.io/badge/Ubuntu-E95420?style=flat-square&logo=Ubuntu&logoColor=white"/> <img src="https://img.shields.io/badge/FUSE-4E6C50?style=flat-square&logoColor=white"/>
 
-A FUSE file system is typically implemented as a standalone
-application that links with libfuse. libfuse provides functions to
-mount the file system, unmount it, read requests from the kernel, and
-send responses back. libfuse offers two APIs: a "high-level",
-synchronous API, and a "low-level" asynchronous API. In both cases,
-incoming requests from the kernel are passed to the main program using
-callbacks. When using the high-level API, the callbacks may work with
-file names and paths instead of inodes, and processing of a request
-finishes when the callback function returns. When using the low-level
-API, the callbacks must work with inodes and responses must be sent
-explicitly using a separate set of API functions.
+유튜브 시연영상: https://youtu.be/TigzcfoqlVU
 
+## **1. 프로젝트 목표**
 
-Development Status
-------------------
+FUSE를 활용하여 UFFS 파일시스템을 구현하는 것을 목표로 하였습니다. 이를 통해 파일시스템의 원리를 이해하고, 임베디드 환경에서의 파일시스템 설계와 동작 방식을 탐구하는 경험을 얻고자 하였습니다.
 
-libfuse is shipped by all major Linux distributions and has been in
-production use across a wide range of systems for many years. However,
-at present libfuse does not have any active, regular contributors. The
-current maintainer continues to apply pull requests and makes regular
-releases, but unfortunately has no capacity to do any development
-beyond addressing high-impact issues. When reporting bugs, please
-understand that unless you are including a pull request or are
-reporting a critical issue, you will probably not get a response. If
-you are using libfuse, please consider contributing to the project.
+## **2. 프로젝트 진행 내용**
 
+### **2.1 주제 선정**
 
-Supported Platforms
--------------------
+운영체제의 핵심 요소인 파일시스템을 직접 설계 및 구현해보고 싶다는 생각에서 출발하여, 사용자 영역에서 파일시스템을 구현할 수 있는 도구인 FUSE를 사용하기로 결정하였습니다. 구현할 파일시스템 선정을 위해 관련 논문, 구글링, 깃허브 등을 통해 다양한 파일시스템을 조사하였습니다.
 
-* Linux (fully)
-* BSD (mostly/best-effort)
-* For OS-X, please use [OSXFUSE](https://osxfuse.github.io/)
-  
+그러던 도중 지도교수님의 제안으로 UFFS라는 임베디드 파일시스템을 알게 되었으며, 조사 결과 FUSE를 활용한 UFFS 구현 레퍼런스가 존재하지 않는 것을 확인하였습니다. 따라서 FUSE를 활용한 UFFS 구현은 독창성이 있으며 학습적인 가치가 크다고 판단하여 최종 주제로 선정하였습니다.
 
-Installation
-------------
+### **2.2 FUSE 학습**
 
-You can download libfuse from https://github.com/libfuse/libfuse/releases. To build and
-install, you must use [Meson](http://mesonbuild.com/) and
-[Ninja](https://ninja-build.org).  After downloading the tarball and `.sig` file, verify
-it using [signify](https://www.openbsd.org/papers/bsdcan-signify.html):
+FUSE(Filesystem in Userspace)는 사용자 영역에서 파일시스템을 구현할 수 있도록 지원하는 라이브러리입니다. 
 
-    signify -V -m fuse-X.Y.Z.tar.gz -p fuse-X.Y.pub
-    
-The `fuse-X.Y.pub` file contains the signing key and needs to be obtained from a
-trustworthy source. Each libfuse release contains the signing key for the release after it
-in the `signify` directory, so you only need to manually acquire this file once when you
-install libfuse for the first time.
+리눅스는 커널의 VFS(Virtual File System)를 통해 여러 마운트된 파일시스템에 일관된 접근을 제공합니다. 각 마운트 포인트에 연결된 파일시스템을 관리하여 특정 디렉터리에 대한 명령이 적절한 파일시스템에서 처리되도록 합니다.
 
-After you have validated the tarball, extract it, create a (temporary) build directory and
-run Meson:
+FUSE(Filesystem in Userspace)를 사용하여 디렉터리에 파일시스템을 마운트하면, 해당 디렉터리에 대한 명령은 FUSE 파일시스템으로 전달됩니다. 커널의 FUSE 모듈은 사용자 공간에서 실행 중인 FUSE 프로세스에 요청을 전달하여 적절한 메서드를 호출합니다.
 
-    $ tar xzf fuse-X.Y.Z.tar.gz; cd fuse-X.Y.Z
-    $ mkdir build; cd build
-    $ meson setup ..
+위의 과정을 통해 사용자 영역에서 파일 시스템 함수를 구현하고 이를 마운트하면, 해당 마운트 포인트를 저희가 구현한 파일 시스템으로 사용할 수 있습니다.
 
-Normally, the default build options will work fine. If you
-nevertheless want to adjust them, you can do so with the
-*meson configure* command:
+FUSE 팀이 제공하는 GitHub 코드와 문서를 분석하고 예제 코드를 실행해보며 FUSE가 커널과 사용자 공간 간의 파일시스템 요청을 처리하는 과정을 학습하였고, FUSE 가 파일 및 디렉토리와 관련된 작업을 어떻게 지원하는지 구체적으로 파악하였습니다.
 
-    $ meson configure # list options
-    $ meson configure -D disable-mtab=true # set an option
+### **2.3 UFFS 분석**
 
-To build, test, and install libfuse, you then use Ninja:
+UFFS는 플래시 메모리 기반의 임베디드 파일시스템으로, 플래시 메모리의 블록 및 페이지 단위 특성을 고려한 설계를 갖추고 있습니다. 추후 구현을 위해 먼저 UFFS의 오픈소스 코드를 분석하며 주요 동작 원리를 학습하였습니다. 주요 학습 내용은 다음과 같습니다:
 
-    $ ninja
-    $ sudo python3 -m pytest test/
-    $ sudo ninja install
+- **트리 기반 구조:** UFFS는 트리와 노드를 사용하여 파일 및 디렉토리를 관리합니다.
+- **블록 및 페이지 관리:** 플래시 메모리의 특성에 맞게 데이터를 블록과 페이지 단위로 관리합니다.
+- **저널링:** 데이터 무결성을 보장하기 위한 저널링 메커니즘을 지원합니다.
+- **오류 관리 : B**ad Block, ECC등을 활용하여 손상된 블록과 페이지를 관리합니다.
 
-Running the tests requires the [py.test](http://www.pytest.org/)
-Python module. Instead of running the tests as root, the majority of
-tests can also be run as a regular user if *util/fusermount3* is made
-setuid root first:
+참고한 UFFS 레퍼런스 코드  https://github.com/rickyzheng/uffs
 
-    $ sudo chown root:root util/fusermount3
-    $ sudo chmod 4755 util/fusermount3
-    $ python3 -m pytest test/
+이를 바탕으로 UFFS의 핵심 기능을 이해하고, FUSE로 구현하기 위한 설계를 시작하였습니다.
 
-Security implications
----------------------
+### **2.4 램디스크 기반 구현**
 
-The *fusermount3* program is installed setuid root. This is done to
-allow normal users to mount their own filesystem implementations.
+UFFS의 레퍼런스 코드를 분석한 결과, 초기 단계에서는 난이도가 높다고 판단하여 램디스크 기반으로 구현을 시작하였습니다. 구현 방식과 구현된 기능은 다음과 같습니다:
 
-To limit the harm that malicious users can do this way, *fusermount3*
-enforces the following limitations:
+### **2.4.1 구현 방식**
 
-  - The user can only mount on a mountpoint for which they have write
-    permission
+- **트리 구조 설계**
+    - 메모리 상에서 트리를 구성하고, 각 노드가 파일과 디렉토리를 나타내도록 설계하였습니다.
+    - 노드를 활용하여 데이터를 효율적으로 검색하고 관리할 수 있도록 구현하였습니다.
+- **블록 단위 데이터 구조**
+    - 데이터 관리를 간소화하기 위해 페이지 대신 블록 단위를 채택하였습니다.
 
-  - The mountpoint must not be a sticky directory which isn't owned by
-    the user (like /tmp usually is)
+### **2.4.2 구현한 기능**
 
-  - No other user (including root) can access the contents of the
-    mounted filesystem (though this can be relaxed by allowing the use
-    of the *allow_other* and *allow_root* mount options in
-    */etc/fuse.conf*)
+- **파일 읽기/쓰기 (read/write):** 파일 내용을 블록단위로 읽고 쓰는 기능을 구현하였습니다.
+- **파일 및 디렉토리 열기 (open/opendir):** 파일 및 디렉토리를 여는 기능을 구현하였습니다.
+- **파일 생성 (create):** 새로운 파일을 생성하는 기능을 구현하였습니다.
+- **디렉토리 생성 (mkdir):** 새 디렉토리를 생성하는 기능을 구현하였습니다.
+- **디렉토리 읽기 (readdir):** 디렉토리 내용을 탐색하여 파일 및 하위 디렉토리를 반환하는 기능을 구현하였습니다.
 
+램디스크 기반으로 UFFS의 핵심 기능 구현을 완료한 이후 팀원 전체가 파일시스템 구현에 대한 자신감과 의욕이 생겼고, USB 플래시 메모리를 활용한 디스크 기반 확장 구현을 시작하였습니다.
 
-If you intend to use the *allow_other* mount options, be aware that
-FUSE has an unresolved [security
-bug](https://github.com/libfuse/libfuse/issues/15): if the
-*default_permissions* mount option is not used, the results of the
-first permission check performed by the file system for a directory
-entry will be re-used for subsequent accesses as long as the inode of
-the accessed entry is present in the kernel cache - even if the
-permissions have since changed, and even if the subsequent access is
-made by a different user. This is of little concern if the filesystem
-is accessible only to the mounting user (which has full access to the
-filesystem anyway), but becomes a security issue when other users are
-allowed to access the filesystem (since they can exploit this to
-perform operations on the filesystem that they do not actually have
-permissions for).
+### **2.5 USB 플래시 메모리 기반 구현**
 
-This bug needs to be fixed in the Linux kernel and has been known
-since 2006 but unfortunately no fix has been applied yet. If you
-depend on correct permission handling for FUSE file systems, the only
-workaround is to use `default_permissions` (which does not currently
-support ACLs), or to completely disable caching of directory entry
-attributes.
+USB 플래시 메모리를 활용하여 UFFS의 디스크 기반 구현을 진행하였습니다. 이 과정중에서 최대한 UFFS의 구현 및 동작 방식을 유지하려고 노력했습니다. 구현 방식과 구현한 기능은 아래와 같습니다:
 
-Building your own filesystem
-------------------------------
+### **2.5.1 구현 방식**
 
-FUSE comes with several example file systems in the `example`
-directory. For example, the *passthrough* examples mirror the contents
-of the root directory under the mountpoint. Start from there and adapt
-the code!
+1. **페이지 단위 데이터 관리**
+    - 램디스크에서 사용했던 블록 단위 입출력을 페이지 단위로 전환하였습니다.
+    - 페이지 내부에 태그와 미니헤더를 추가하여 메타데이터를 효율적으로 관리하도록 설계하였습니다.
+2. **디스크 기반 입출력**
+    - 데이터를 메모리 배열로 직접 접근하는 방식 대신, pread와 pwrite 함수를 활용하여 디스크의 특정 오프셋으로 파일 입출력을 처리하도록 구현하였습니다. 이 과정에서 페이지 단위를 사용하여 UFFS 의 특성을 반영하였습니다.
+3. **UFFS 포맷 및 포맷 체크**
+    - USB 첫번째 블록의 매직넘버를 사용하여 UFFS로 포맷이 되었는지 확인하고 포맷이 안 되어있으면 모든 블록과 페이지를 초기화하고 포맷이 되어있다면 해당 USB에 저장된 파일들을 노드로 생성하여 로드하는 로직을 구현하였습니다.
 
-The documentation of the API functions and necessary callbacks is
-mostly contained in the files `include/fuse.h` (for the high-level
-API) and `include/fuse_lowlevel.h` (for the low-level API). An
-autogenerated html version of the API is available in the `doc/html`
-directory and at http://libfuse.github.io/doxygen.
+### **2.5.2 구현한  기능**
 
+- 램디스크 기반에서 구현된 **2.3.2**의 모든 핵심 기능을 디스크 기반으로 이식하여 완성하였습니다.
 
-Getting Help
-------------
+이와 같은 단계를 통해 램디스크에서 시작하여 USB 플래시 메모리 기반으로 확장된 UFFS의 디스크 기반 구현을 성공적으로 완료하였습니다.
 
-If you need help, please ask on the <fuse-devel@lists.sourceforge.net>
-mailing list (subscribe at
-https://lists.sourceforge.net/lists/listinfo/fuse-devel).
+## **3. 프로젝트 진행 결과**
 
-Please report any bugs on the GitHub issue tracker at
-https://github.com/libfuse/libfuse/issues.
+### **3.1 램디스크 기반 UFFS 구현**
+
+1. **FUSE 핵심 인터페이스 함수 구현**
+    - read, write, open, readdir, opendir, create, init 등의 인터페이스를 성공적으로 구현하였고, 테스트를 통해 모든 기능이 정상 동작함을 확인하였습니다.
+    - 파일시스템의 기본적인 입출력 작업을 지원하며, 메모리 내 데이터 관리가 정확히 이루어지도록 설계되었습니다.
+2. **파일 및 디렉토리 관리**
+    - 블록 단위의 배열을 활용하여 트리 노드 및 데이터를 관리하였습니다.
+    - 트리 구조를 통해 효율적으로 파일 및 디렉토리 검색과 관리를 구현하였습니다.
+
+### 3.2 USB 기반 UFFS 구현
+
+1. **FUSE 핵심 인터페이스 함수 구현**
+    - 램디스크 구현에서 성공한 read, write, open, readdir, opendir, create, init 기능을 디스크 기반으로 이식하였으며, 테스트 결과 모두 정상적으로 동작함을 확인하였습니다.
+2. **페이지 단위 데이터 관리**
+    - USB 플래시 메모리를 활용하여 페이지 단위 데이터 입출력을 지원하였습니다.
+    - 디스크 기반에서 UFFS의 특성을 반영하기 위해 페이지에 태그 및 미니헤더를 포함한 메타데이터 관리를 추가하였습니다.
+3. **파일시스템 초기화 및 로드**
+    - UFFS의 포맷 확인 및 초기화를 구현하여, 포맷되지 않은 디스크는 초기화 후 파일시스템으로 설정되도록 설계하였습니다.
+    - UFFS로 이미 포맷 된 경우 기존에 저장된 파일 및 디렉토리는 트리 구조로 로드되어 정상적으로 관리됩니다.
+
+램디스크 및 USB 기반 UFFS 핵심 기능 구현을 완료하였습니다. 테스트 결과 파일시스템 핵심기능이 정상 작동하는 것을 확인하였습니다.
+
+### **3.3 미완성된 기능**
+
+- **저널링:** 데이터 무결성을 보장하기 위한 저널링 메커니즘은 시간 부족으로 구현하지 못하였습니다.
+- **Bad Block 관리:** 플래시 메모리의 불량 블록 관리를 처리하는 기능은 구현되지 않았습니다.
+- **삭제:** 파일 및 디렉토리 삭제 기능은 구현되지 않았습니다.
+- **오류 검출:** ECC를 통한 오류 검출 기능은 구현되지 않았습니다.
+
+## **4. 기타 (문제점, 해결방법, 자기평가)**
+
+### **4.1 발생한 문제 및 해결방안**
+
+1. **FUSE와 UFFS의 구조적 차이:**
+    - **문제:** UFFS 레퍼런스 코드는 코드 분량이 방대하기 때문에 분석하는데 어려움을 겪었습니다. 또한 FUSE를 사용하지 않고 마운트를 직접 진행하기 때문에 레퍼런스 코드를 그대로 사용할 수 없었습니다.
+    - **해결:** UFFS 코드의 함수 별로 원리를 파악하여 FUSE 인터페이스에 맞춰 기능을 구현하였습니다. 이 과정은 UFFS 기본 개념에 대한 이해가 수반되어야 했습니다. UFFS 설명 자료와 코드를 참고하여 전체적인 구조를 이해하려 노력하였습니다.
+
+### **4.2 자기평가**
+
+- **프로젝트 의의 및 가치:**
+    - FUSE를 활용하여 UFFS라는 파일시스템을 구현한 것이 최초라는 점에서  큰 가치를 느꼈습니다.
+    - 램디스크와 디스크 기반 모두에서 UFFS를 구현함으로써 파일시스템 설계와 구현 역량을 크게 향상시켰습니다.
+    - 특히, 디스크 기반으로 확장하여 핵심 기능을 완성한 것은 팀원 모두에게 큰 성취감을 주었으며, 프로젝트에 대한 흥미와 주도성을 높이는 계기가 되었습니다.
+- **개선점:**
+    - 저널링과 Bad Block 관리와 같은 플래시 메모리 특화 기능을 구현하지 못한 점이 아쉬움으로 남습니다.
+    - 프로젝트 범위를 보다 현실적으로 설정하고, 시간 관리를 철저히 하여 제한된 기간 내에서 더욱 완성도 높은 결과를 도출할 필요성을 느꼈습니다.
+
+## **5. 결론**
+
+이번 프로젝트를 통해 FUSE를 활용하여 UFFS 파일시스템을 사용자 영역에서 구현하며, 파일시스템의 설계와 동작 원리를 심도 있게 이해할 수 있었습니다. 램디스크 기반 구현에서 시작해 USB 기반으로 확장하는 과정을 거치며, 직접 구현을 통해 그동안 추상적으로 이해했던 개념들을 구체적으로 적용하여 학습의 깊이를 더할 수 있었습니다. 이 프로젝트는 운영체제와 파일시스템에 대한 이해도를 한층 높이는 값진 경험이 되었습니다.
