@@ -119,3 +119,21 @@ Fine-grained locking은 deadlock-free 설계와 검증에 높은 복잡도와 �
 - 테스트 구조가 단순화된다.
 - 병렬 처리 성능이 제한된다.
 - 향후 확장 시 락 구조 재설계가 필요할 수 있다.
+
+# ADR-005: Crash Consistency
+
+Status: Accepted  
+Date: 2026-02-19
+
+## Context
+Crash Consistency를 보장하는데에는 로그 기반 저널링과 COW가 있다. 저널링을 하려면 저널을 보고 메타데이터를 overwrite 를 해야한다. UFFS는 기
+본적으로 NAND Flash 기 때문에 overwrite 가 안된다. 
+
+
+## Decision
+COW를 채택
+
+
+## Consequences
+
+- 
