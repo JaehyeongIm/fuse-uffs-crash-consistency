@@ -99,7 +99,7 @@
 
 ## 1.2 Scope (범위)
 
-본 시스템은 UFFS 파일시스템의 파일 입출력 기능을 FUSE 인터페이스를 통해 사용자 공간(Userspace)에서 구현합니다. 특히 **크래시 정합성(Crash Consistency)**을 핵심 기능으로 한다. 본 시스템은 전원 차단, 커널 패닉, 또는 파일시스템 프로세스 비정상 종료와 같은 크래시 상황에서도 파일시스템 메타데이터 및 데이터의 일관성을 보장한다.
+본 시스템은 UFFS 파일시스템의 파일 입출력 기능을 FUSE 인터페이스를 통해 사용자 공간(Userspace)에서 구현한다. 특히 **크래시 정합성(Crash Consistency)**을 핵심 기능으로 한다. 본 시스템은 전원 차단, 커널 패닉, 또는 파일시스템 프로세스 비정상 종료와 같은 크래시 상황에서도 파일시스템 메타데이터 및 데이터의 일관성을 보장한다.
 
 **주요 특징:**
 - **POSIX 호환**: 표준 파일시스템 API 제공
@@ -714,6 +714,7 @@ sudo make install
 | **UFFS (Ultra-low-cost Flash File System)** | NAND 플래시용 경량 파일시스템 |
 | **VFS (Virtual File System)** | 가상 파일시스템. 리눅스 커널의 파일시스템 추상화 계층 |
 | **Write-Ahead Logging (WAL)** | 선행 기록 로깅. 데이터 변경 전에 로그를 기록하여 복구를 보장하는 기법 |
+// Todo:네임스페이스 추가
 
 ## 5.4 Use Cases and Scenarios (사용 사례)
 
@@ -764,7 +765,7 @@ sudo make install
 | FR-META-001 | 메타데이터 조회 | High | Unit Test | TC-META-001 | TBD |
 | FR-CONC-001 | 동시 접근 안전성 | Medium | Concurrency Test | TC-CONC-001 | TBD |
 | **NFR-REL-001** | **데이터 손실 방지** | **Critical** | **Durability Test** | **TC-REL-001** | **TBD** |
-
+//Todo: 우선순위 3단계에 맞춰 다시 수정
 **Note**: TBD = To Be Determined (구현 단계에서 결정)
 
 **상태 값**:
@@ -820,7 +821,7 @@ sudo make install
 | 버전 | 날짜 | 작성자 | 변경 내용 |
 |-----|------|--------|----------|
 | 1.0 | 2026.02.14 | 임재형 | 초안 작성 |
-| 1.1 | 2026.02.22 | 임재형 | ISO/IEC/IEEE 29148:2018 Annex B 표준 목차 적용 |
+
 
 ---
 
