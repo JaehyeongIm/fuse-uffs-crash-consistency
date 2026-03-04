@@ -39,3 +39,11 @@ TAGS
 /test/test_setattr
 /build/
 .vscode/*
+
+
+# Claude Code
+.claude/
+.anthropic/
+claude.json
+*.claude.log
+*-claude.md
