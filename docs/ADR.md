@@ -91,19 +91,20 @@ FUSE 기반 사용자 공간 구현 방식을 채택한다.
 - 성능 평가는 참고 수준으로 제한된다.
 
 
-# ADR-004: 전역  락을 사용하여 동시성 지원
+# ADR-004: 전역 락(Global Lock)으로 FUSE 콜백 직렬화
 
-Status: Accepted  
+Status: Accepted
 Date: 2026-02-19
 
 ## Context
 
 파일시스템의 동시성 관리 전략을 결정해야 한다.
 프로젝트 기간은 제한적이며, crash consistency 검증이 1차 목표이다.
+SRS §1.2에서 동시성 지원은 Out of Scope로 명시되어 있다.
 
 검토한 후보:
 
-- 전역 락
+- 전역 락 (모든 FUSE 콜백 직렬화)
 - 전체 fine-grained locking
 - 전역 락 + 부분적 fine-grained locking
 
@@ -111,25 +112,40 @@ Fine-grained locking은 deadlock-free 설계와 검증에 높은 복잡도와 �
 
 ## Decision
 
-전역 락 전략을 채택한다.
+단일 전역 뮤텍스(`g_lock`)로 모든 FUSE 콜백을 직렬화한다.
+동시 접근은 지원하지 않으며, FUSE 콜백 진입 시 락을 획득하고 반환 전에 해제한다.
 
 ## Consequences
 
-- 설계 복잡도가 감소한다.
-- 테스트 구조가 단순화된다.
+- 동시성을 지원하지 않으므로, 다중 스레드 동시 접근은 직렬화된다.
+- 설계 복잡도와 크래시 정합성 검증이 단순화된다.
 - 병렬 처리 성능이 제한된다.
-- 향후 확장 시 락 구조 재설계가 필요할 수 있다.
+- 향후 동시성이 필요한 경우 락 구조 재설계가 필요하다.
 
-# ADR-005: Crash Consistency
+# ADR-005: Crash Consistency 구현 방식으로 Two-Phase Write(CoW 기반) 채택
 
-Status: Accepted  
+Status: Accepted
 Date: 2026-02-19
 
 ## Context
-Crash Consistency를 보장하는데에는 로그 기반 저널링과 COW가 있다. 저널링을 하려면 저널을 보고 메타데이터를 overwrite 를 해야한다. UFFS는 기본적으로 NAND Flash 기 때문에 overwrite 가 안된다. 
+
+Crash Consistency를 보장하는 방식으로 로그 기반 저널링과 CoW(Copy-on-Write) 기반 방식이 있다.
+저널링은 커밋 시 메타데이터를 overwrite해야 하는데, NAND Flash는 블록 소거 없이 overwrite가 불가능하다.
 
 ## Decision
-COW를 채택
+
+CoW 기반의 **Two-Phase Write 프로토콜**을 채택한다.
+
+구체적으로 `seal_byte`를 활용한 2단계 쓰기로 구현한다:
+- Phase 1 (Unseal): 데이터를 새 페이지에 기록, `seal_byte=0x00` 설정
+- Phase 2 (Seal): `seal_byte=0xFE`로 단일 바이트 기록 (원자적 커밋)
+- 복구 시 `seal_byte=0xFE`인 페이지만 신뢰 (마운트 스캔 기반)
+
+이 방식은 NAND Flash의 "0→1 비트 변경 불가" 특성을 활용하여 seal 쓰기의 원자성을 보장한다.
 
 ## Consequences
-- 파일시스템의 NAND Flash 친화성 유지
+
+- NAND Flash의 overwrite 불가 제약을 자연스럽게 수용한다.
+- 크래시 후 마운트 스캔만으로 정합 상태를 복원할 수 있다.
+- 페이지 단위 원자성이 보장되어 중간 상태가 트리에 반영되지 않는다.
+- `uffs-reference`의 TagStore/seal 개념을 계승하되, 구현은 독자적이다 (DR-002 참조).

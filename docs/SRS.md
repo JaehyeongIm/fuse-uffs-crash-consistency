@@ -507,8 +507,9 @@ sudo make install
 
 | 요구사항 ID | 검증 방법 | 도구/기법 |
 |-----------|----------|----------|
-| FR-FILE-001~008| Unit Test | Google Test |
-| FR-DIR-001~004 | Unit Test | Google Test |
+| FR-FILE-001~007 | Unit Test | Google Test |
+| FR-DIR-001 | Crash Test | Power-cut simulator |
+| FR-DIR-002~004 | Unit Test | Google Test |
 | FR-META-001 | Unit Test | Google Test |
 | NFR-REL-001 | Stress Test, Crash Test | Power-cut simulator (1,000회+) |
 

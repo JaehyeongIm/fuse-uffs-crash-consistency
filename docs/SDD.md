@@ -52,12 +52,6 @@
   - [8.1 Source File Structure (소스 파일 구조)](#81-source-file-structure-소스-파일-구조)
   - [8.2 Compile-Time Constants (컴파일 타임 상수)](#82-compile-time-constants-컴파일-타임-상수)
   - [8.3 CMake Configuration](#83-cmake-configuration)
-- [9. Design Rationale (설계 근거)](#9-design-rationale-설계-근거)
-    - [DR-001: uffs-disk를 재사용하지 않는 이유](#dr-001-uffs-disk를-재사용하지-않는-이유)
-    - [DR-002: uffs-reference를 직접 링크하지 않는 이유](#dr-002-uffs-reference를-직접-링크하지-않는-이유)
-    - [DR-003: 전역 락(Global Lock) 사용 이유](#dr-003-전역-락global-lock-사용-이유)
-    - [DR-004: fdatasync()를 fsync() 말고 사용하는 이유](#dr-004-fdatasync를-fsync-말고-사용하는-이유)
-    - [DR-005: seal\_byte를 별도 바이트로 분리한 이유](#dr-005-seal_byte를-별도-바이트로-분리한-이유)
 - [문서 개정 이력](#문서-개정-이력)
 
 ---
@@ -909,40 +903,6 @@ add_subdirectory(tests)
 
 ---
 
-# 9. Design Rationale (설계 근거)
-
-### DR-001: uffs-disk를 재사용하지 않는 이유
-
-`uffs-disk/`의 초기 구현은 다음 구조적 문제로 인해 재사용하지 않는다:
-
-| 문제 | 위치 | SRS 충돌 |
-|-----|-----|---------|
-| 파일 크기 16KB 제한 (단일 File Header Block만 사용) | `mkuffs.c` | FR-FILE-004 |
-| `write()` 시 offset 파라미터 무시 | `mkuffs.c` | FR-FILE-004 |
-| fsync/seal 메커니즘 없음 | 전체 | FR-FILE-005 |
-| `unlink`/`rename`/`rmdir` 미구현 | `mkuffs.c` | FR-FILE-006~007, FR-DIR-004 |
-| `getattr`에서 st_size 항상 512로 고정 | `mkuffs.c` | FR-META-001 |
-| 64비트 포인터 캐스트 버그 | `uffs_tree.c` | 안정성 |
-
-### DR-002: uffs-reference를 직접 링크하지 않는 이유
-
-`uffs-reference/`는 실제 하드웨어 드라이버 인터페이스(`uffs_StorageAttrSt`, `uffs_FlashOpsSt`)를 가정한다. 본 프로젝트는 파일 기반 이미지를 NAND 플래시로 시뮬레이션하므로 인터페이스 불일치가 발생한다. 또한 ECC, 배드 블록 관리 등 Out of Scope 기능이 포함되어 있다.
-
-UFFS의 핵심 개념(TagStore, serial/parent 트리, Two-phase Write)만 독자적으로 구현한다.
-
-### DR-003: 전역 락(Global Lock) 사용 이유
-
-SRS §1.2에서 동시성 지원을 Out of Scope로 명시하였으므로, 복잡한 세분화된 락(fine-grained lock) 대신 단일 전역 뮤텍스로 모든 FUSE 콜백을 직렬화한다. 이는 구현 단순성과 크래시 정합성 검증의 용이성을 높인다.
-
-### DR-004: fdatasync()를 fsync() 말고 사용하는 이유
-
-fsync()는 파일 메타데이터(atime 등)도 포함하여 불필요한 I/O가 발생한다. fdatasync()는 데이터와 크기 변경에만 적용되어 더 적합하다. 단, FUSE 레이어에서는 flash_fd에 대해 fdatasync()를 호출한다.
-
-### DR-005: seal_byte를 별도 바이트로 분리한 이유
-
-NAND 플래시는 비트를 0에서 1로 되돌리려면 블록 전체를 지워야 한다. seal_byte=0x00(쓰기 중)에서 0xFE(완료)로의 변경은 단일 바이트의 특정 비트를 0→1로 변경하는 것이므로, 블록 소거 없이 가능하다. 이 속성이 Two-phase Write의 원자성 기반이다.
-
----
 
 # 문서 개정 이력
 

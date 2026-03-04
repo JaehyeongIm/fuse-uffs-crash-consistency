@@ -3,7 +3,7 @@
 **문서 표준**: ISO/IEC/IEEE 29119-3
 **Test Plan ID**: TP-UFFS-001
 **Reference SRS**: SRS v1.0 (2026.02.22)
-**Version**: 0.3
+**Version**: 0.1
 **Date**: 2026-03-04
 **Status**: Draft
 
@@ -21,18 +21,18 @@
 
 | 요구사항 ID | 요구사항 이름 | 테스트 유형 |
 |------------|-------------|-----------|
-| FR-FILE-001 | 파일 열기 | Unit Test |
-| FR-FILE-002 | 파일 생성 | Unit Test |
-| FR-FILE-003 | 파일 읽기 | Unit Test |
-| FR-FILE-004 | 파일 쓰기 | Unit Test |
+| FR-FILE-001 | 파일 열기 | Integration Test |
+| FR-FILE-002 | 파일 생성 | Integration Test |
+| FR-FILE-003 | 파일 읽기 | Integration Test |
+| FR-FILE-004 | 파일 쓰기 | Integration Test |
 | FR-FILE-005 | 파일 동기화 (fsync) | Crash Test |
-| FR-FILE-006 | 파일 이름 변경 (rename) | Unit Test |
-| FR-FILE-007 | 파일 삭제 | Unit Test |
+| FR-FILE-006 | 파일 이름 변경 (rename) | Integration Test |
+| FR-FILE-007 | 파일 삭제 | Integration Test |
 | FR-DIR-001 | 디렉토리 동기화 (fsync) | Crash Test |
-| FR-DIR-002 | 디렉토리 읽기 | Unit Test |
-| FR-DIR-003 | 디렉토리 생성 | Unit Test |
-| FR-DIR-004 | 디렉토리 삭제 | Unit Test |
-| FR-META-001 | 메타데이터 조회 | Unit Test |
+| FR-DIR-002 | 디렉토리 읽기 | Integration Test |
+| FR-DIR-003 | 디렉토리 생성 | Integration Test |
+| FR-DIR-004 | 디렉토리 삭제 | Integration Test |
+| FR-META-001 | 메타데이터 조회 | Integration Test |
 | NFR-REL-001 | fsync 이후 데이터 손실 방지 | Durability Test |
 
 ### Out of Scope
