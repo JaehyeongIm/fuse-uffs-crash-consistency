@@ -126,14 +126,10 @@ Status: Accepted
 Date: 2026-02-19
 
 ## Context
-Crash Consistency를 보장하는데에는 로그 기반 저널링과 COW가 있다. 저널링을 하려면 저널을 보고 메타데이터를 overwrite 를 해야한다. UFFS는 기
-본적으로 NAND Flash 기 때문에 overwrite 가 안된다. 
-
+Crash Consistency를 보장하는데에는 로그 기반 저널링과 COW가 있다. 저널링을 하려면 저널을 보고 메타데이터를 overwrite 를 해야한다. UFFS는 기본적으로 NAND Flash 기 때문에 overwrite 가 안된다. 
 
 ## Decision
 COW를 채택
 
-
 ## Consequences
-
-- 
+- 파일시스템의 NAND Flash 친화성 유지

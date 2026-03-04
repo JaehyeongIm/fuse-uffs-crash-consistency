@@ -2,10 +2,9 @@
 ## Software Requirements Specification (SRS)
 
 **문서 표준**: ISO/IEC/IEEE 29148
-**버전(Version)**: 1.1
+**버전(Version)**: 1.0
 **작성일(Date)**: 2026.02.22
 **작성자(Author)**: 임재형
-**상태(Status)**: 초안
 
 ---
 
@@ -40,34 +39,27 @@
       - [FR-FILE-005: 파일 동기화 (fsync)](#fr-file-005-파일-동기화-fsync)
       - [FR-FILE-006: 파일 이름 변경 (rename)](#fr-file-006-파일-이름-변경-rename)
       - [FR-FILE-007: 파일 삭제](#fr-file-007-파일-삭제)
-      - [FR-FILE-008: 파일, 폴더 동시성 지원](#fr-file-008-파일-폴더-동시성-지원)
     - [3.2.2 Directory Operations (디렉토리 연산)](#322-directory-operations-디렉토리-연산)
       - [FR-DIR-001: 디렉토리 동기화 (fsync)](#fr-dir-001-디렉토리-동기화-fsync)
       - [FR-DIR-002 디렉토리 읽기](#fr-dir-002-디렉토리-읽기)
       - [FR-DIR-003 디렉토리 생성](#fr-dir-003-디렉토리-생성)
       - [FR-DIR-004 디렉토리 삭제](#fr-dir-004-디렉토리-삭제)
       - [FR-META-001 메타데이터 조회](#fr-meta-001-메타데이터-조회)
-    - [3.2.3 Concurrency Requirements (동시성 요구사항)](#323-concurrency-requirements-동시성-요구사항)
-      - [FR-CONC-001: 동시 접근 안전성](#fr-conc-001-동시-접근-안전성)
   - [3.3 Usability requirements (사용성 요구사항)](#33-usability-requirements-사용성-요구사항)
   - [3.4 Performance requirements (성능 요구사항)](#34-performance-requirements-성능-요구사항)
-  - [3.5 Logical database requirements (논리적 데이터 요구사항)](#35-logical-database-requirements-논리적-데이터-요구사항)
-    - [OTH-DATA-001: 파일시스템 포맷](#oth-data-001-파일시스템-포맷)
-    - [OTH-DATA-002: 메타데이터 구조](#oth-data-002-메타데이터-구조)
-  - [3.6 Design constraints (설계 제약사항)](#36-design-constraints-설계-제약사항)
+  - [3.5 Design constraints (설계 제약사항)](#35-design-constraints-설계-제약사항)
     - [OTH-LEG-001: 오픈소스 라이선스](#oth-leg-001-오픈소스-라이선스)
-  - [3.7 Software system attributes (소프트웨어 시스템 속성)](#37-software-system-attributes-소프트웨어-시스템-속성)
-    - [3.7.1 Reliability and Availability (신뢰성 및 가용성)](#371-reliability-and-availability-신뢰성-및-가용성)
+  - [3.6 Software system attributes (소프트웨어 시스템 속성)](#36-software-system-attributes-소프트웨어-시스템-속성)
+    - [3.6.1 Reliability and Availability (신뢰성 및 가용성)](#361-reliability-and-availability-신뢰성-및-가용성)
       - [NFR-REL-001: 데이터 손실 방지](#nfr-rel-001-데이터-손실-방지)
-  - [3.8 Supporting information (지원 정보)](#38-supporting-information-지원-정보)
+  - [3.7 Supporting information (지원 정보)](#37-supporting-information-지원-정보)
     - [OTH-INST-001: 빌드 시스템](#oth-inst-001-빌드-시스템)
 - [4. Verification (검증)](#4-verification-검증)
   - [4.1 Verification methods (검증 방법)](#41-verification-methods-검증-방법)
     - [검증 방법 분류](#검증-방법-분류)
     - [검증 매트릭스 (요약)](#검증-매트릭스-요약)
     - [VER-001: 크래시 정합성 검증 (핵심)](#ver-001-크래시-정합성-검증-핵심)
-    - [VER-ORACLE-001: write/fsync 검증은 FUSE read 단독에 의존하지 않는다](#ver-oracle-001-writefsync-검증은-fuse-read-단독에-의존하지-않는다)
-    - [VER-ORACLE-002: raw scan 기반 독립 oracle로 교차검증한다](#ver-oracle-002-raw-scan-기반-독립-oracle로-교차검증한다)
+    - [VER-ORACLE-001: write/fsync 검증은 FUSE read 로 진행한다](#ver-oracle-001-writefsync-검증은-fuse-read-로-진행한다)
   - [4.2 Acceptance criteria (인수 기준)](#42-acceptance-criteria-인수-기준)
     - [기능 요구사항 인수 기준](#기능-요구사항-인수-기준)
     - [최종 릴리즈 인수 기준](#최종-릴리즈-인수-기준)
@@ -90,11 +82,12 @@
 
 ## 1.1 Purpose (목적)
 
-본 Software Requirements Specification (SRS)는 **FUSE(Filesystem in Userspace) 기반 UFFS(Ultra-low-cost Flash File System) 파일시스템 개발**의 요구사항을 명확하고 검증 가능한 형태로 정의합니다.
+본 Software Requirements Specification (SRS)는 FUSE(Filesystem in Userspace) 기반 UFFS(Ultra-low-cost Flash File System) 파일시스템의 Crash Consistency 를 중심으로 개발 범위와 테스트 기준을 명확히 설정합니다.
+Crash Consistency를 보장할 데이터의 범위를 정하고 어느 시점부터 보장할 것인지 시점의 경계를 명확히 설정합니다.
 
 **정의하는 제품:**
 - **제품명**: FUSE 기반 UFFS 파일시스템
-- **버전**: 2.0 (Crash Consistency 추가)
+- **버전**: 1.0
 - **릴리즈**: 첫 번째 안정 버전
 
 ## 1.2 Scope (범위)
@@ -108,7 +101,7 @@
 **시스템이 하는 것 (In Scope):**
 
 1. **파일 연산**: 생성, 읽기, 쓰기, 삭제, 동기화(fsync)
-2. **디렉토리 연산**: 생성,읽기,삭제, 동기화(fsync)
+2. **디렉토리 연산**: 생성, 읽기, 삭제,  동기화(fsync)
 3. **Crash Consistency** : 명시한 범위 내에서 파일 데이터, 메타데이터, 네임스페이스에 대한 crash consistency 보장
 
 **시스템이 하지 않는 것 (Out of Scope):**
@@ -116,7 +109,9 @@
 1. **플래시 관리**: 배드 블록 관리, 웨어 레벨링
 2. **크래시 복구**: 마운트 시 자동 검증 및 복구
 3. **오류 처리**: ECC 기반 비트 오류 자동 수정
-4. 비기능적 요구사항 정의 및 테스트 : 이 프로젝트에서 성능,이식성과 같은 비기능적 요구사항의 정의와 테스트는 제외한다.
+4. **이식성** : 여러버전에 대한 지원 미제공 (FUSE, 우분투)
+5. **성능 최적화**
+6. **동시성 지원**
 
 ## 1.3 Product overview (제품 개요)
 
@@ -141,7 +136,7 @@
 │   (User Space)                  │
 │   • File Management             │
 └─────────────────────────────────┘
-          ↓ Block I/O (read/write/erase)
+          ↓ Block I/O (read/write)
 ┌─────────────────────────────────┐
 │   NAND Flash Device             │  ← 저장 장치
 │   (Physical Storage)            │
@@ -186,13 +181,27 @@
 
 본 시스템은 다음 주요 기능을 제공합니다:
 
-**1. 파일 시스템 기본 연산**
-- 파일 생성, 읽기, 쓰기
-- 메타데이터 조회
+**1. 파일 연산 (File Operations)**
+- 파일 열기 (FR-FILE-001)
+- 파일 생성 (FR-FILE-002)
+- 파일 읽기 (FR-FILE-003)
+- 파일 쓰기 (FR-FILE-004)
+- 파일 동기화 / fsync (FR-FILE-005)
+- 파일 이름 변경 / rename (FR-FILE-006)
+- 파일 삭제 (FR-FILE-007)
 
-**2. 크래시 정합성 (Crash Consistency)**
+**2. 디렉토리 연산 (Directory Operations)**
+- 디렉토리 동기화 / fsync (FR-DIR-001)
+- 디렉토리 읽기 (FR-DIR-002)
+- 디렉토리 생성 (FR-DIR-003)
+- 디렉토리 삭제 (FR-DIR-004)
+
+**3. 메타데이터 조회 (FR-META-001)**
+- 파일 및 디렉토리의 권한, 링크 수, 파일 크기 조회
+
+**4. 크래시 정합성 (Crash Consistency)**
 - 전원 차단 시 데이터 일관성 보장
-- fsync 시점까지의 데이터 보장
+- fsync 성공 시점까지의 파일 데이터 및 디렉토리 엔트리 내구성 보장
 
 ### 1.3.3 User characteristics (사용자 특성)
 
@@ -254,7 +263,7 @@
 각 요구사항은 다음 정보를 포함합니다:
 - **ID**: 고유 식별자
 - **Description**: 요구사항 설명
-- **Priority**: High / Medium / Low
+- **Priority**: Critical / High / Medium / Low
 - **Verification**: 검증 방법 (섹션 4과 연계)
 
 ## 3.1 External interfaces (외부 인터페이스)
@@ -317,7 +326,7 @@ umount <mount_point>
   - `mkdir`: FR-DIR-003과 매핑
   - `rmdir`: FR-DIR-004과 매핑
 
-**Priority**: High
+**Priority**: Critical
 
 ---
 
@@ -328,12 +337,12 @@ umount <mount_point>
 #### FR-FILE-001 파일 열기
 **Description**: 시스템은 파일을 열 수 있어야한다.
 
-**Priority**: High
+**Priority**: Critical
 
 #### FR-FILE-002: 파일 생성
 **Description**: 시스템은 사용자가 지정한 경로에 새로운 빈 파일을 생성할 수 있어야 한다.
 
-**Priority**: High
+**Priority**: Critical
 
 **Verification**: 단위 테스트, 통합 테스트 (섹션 4.1 참조)
 
@@ -342,7 +351,7 @@ umount <mount_point>
 #### FR-FILE-003: 파일 읽기
 **Description**: 시스템은 파일의 지정된 오프셋부터 지정된 크기만큼 데이터를 읽을 수 있어야 한다.
 
-**Priority**: High
+**Priority**: Critical
 
 **Verification**: 단위 테스트, 성능 테스트
 
@@ -351,7 +360,7 @@ umount <mount_point>
 #### FR-FILE-004: 파일 쓰기
 **Description**: 시스템은 파일의 지정된 오프셋에 데이터를 쓸 수 있어야 한다.
 
-**Priority**: High
+**Priority**: Critical
 
 **Verification**: 단위 테스트, 통합 테스트
 
@@ -366,7 +375,7 @@ umount <mount_point>
 - FR-FILE-005-2 (파일 사이즈 내구성): fsync(fd) 가 0을 반환하면, 해당 호출 이전에 완료된 쓰기로 인해 변경된 파일 크기는 이후 비정상 종료 및 재마운트 후에도 동일하게 관측되어야한다.
 - FR-FILE-005-3 내구성 보장의 경계: fsync의 내구성 보장은 파일 객체 자체에 한정되며, 파일의 이름/경로 관측가능성은 FR-DIR-001에 의해 정의된다.
 
-**Priority**: High
+**Priority**: Critical
 
 #### FR-FILE-006: 파일 이름 변경 (rename)
 
@@ -376,13 +385,6 @@ umount <mount_point>
 #### FR-FILE-007: 파일 삭제
 
 **Description**: 시스템은 지정된 파일을 삭제할 수 있다.
-
-**Priority**: Medium
-
-
-#### FR-FILE-008: 파일, 폴더 동시성 지원
-
-**Description**: 시스템은 모든 파일 및 디렉토리 연산에 대해 전역 뮤텍스 락(Global Mutex Lock)을 사용하여 멀티스레드 환경에서의 동시 접근 안전성을 보장해야 한다. 상세 동시성 요구사항은 FR-CONC-001에서 정의한다.
 
 **Priority**: Medium
 
@@ -422,44 +424,6 @@ UFFS 파일시스템은 디렉토리 구조가 스캔 기반 메타레코드로 
 **Description**: 시스템은 파일, 폴더의 메타데이터를 조회할 수 있다. (권한, 링크, 파일의 길이)
 **Priority**: Medium
 
-### 3.2.3 Concurrency Requirements (동시성 요구사항)
-
-**Scope Note**:
-본 섹션은 "동시성 성능 최적화"가 아니라, **동시 접근 상황에서의 무결성(Integrity), 원자성(Atomicity), 데드락 프리(Deadlock-free)**를 신뢰성 범위에 포함하기 위한 요구사항을 정의한다.
-
-#### FR-CONC-001: 동시 접근 안전성
-
-**Description**: 시스템은 전역 뮤텍스 락(Global Mutex Lock)을 사용하여 모든 FUSE API 콜백 함수에 대해 스레드 간 동시 접근을 직렬화(serialize)하고, 이를 통해 파일시스템 내부 상태의 무결성을 보장해야 한다.
-
-**Rationale**: FUSE는 멀티스레드 모드에서 동작할 수 있으며, 커널로부터 여러 요청이 동시에 전달될 수 있다. 전역 뮤텍스 락을 사용하면 구현 복잡도를 낮추면서도 동시 접근으로 인한 데이터 레이스(data race)와 파일시스템 상태 손상을 방지할 수 있다.
-
-**Requirements**:
-
-- **FR-CONC-001-1 (전역 뮤텍스 락 적용 범위)**: 시스템은 다음 FUSE API 콜백 함수 진입 시 전역 뮤텍스를 획득(lock)하고, 함수 완료 시 해제(unlock)해야 한다:
-  - `getattr` (FR-META-001)
-  - `open` (FR-FILE-001)
-  - `create` (FR-FILE-002)
-  - `read` (FR-FILE-003)
-  - `write` (FR-FILE-004)
-  - `fsync` (FR-FILE-005)
-  - `rename` (FR-FILE-006)
-  - `unlink` (FR-FILE-007)
-  - `readdir` (FR-DIR-002)
-  - `mkdir` (FR-DIR-003)
-  - `rmdir` (FR-DIR-004)
-  - `fsyncdir` (FR-DIR-001)
-
-- **FR-CONC-001-2 (상호 배제 보장)**: 전역 뮤텍스 락에 의해 동일 시점에 최대 하나의 FUSE API 콜백만 실행되어야 하며, 이를 통해 파일시스템 내부 자료구조(메타데이터, 블록 할당 테이블 등)에 대한 동시 접근이 발생하지 않아야 한다.
-
-- **FR-CONC-001-3 (데드락 프리)**: 전역 뮤텍스 락은 단일 락이므로 데드락이 발생하지 않아야 한다. 락 획득 순서 문제(lock ordering)가 존재하지 않음을 보장한다.
-
-- **FR-CONC-001-4 (스레드 안전성)**: 전역 뮤텍스 락을 통해 보호되는 모든 FUSE API 콜백 함수는 멀티스레드 환경에서 호출되더라도 파일시스템 상태의 일관성을 유지해야 한다.
-
-**Priority**: Medium
-
-**Verification**: 동시성 테스트 — 복수 스레드에서 파일/디렉토리 연산을 동시 수행하여 데이터 레이스, 데드락, 메타데이터 불일치가 발생하지 않음을 검증한다.
-
----
 
 ## 3.3 Usability requirements (사용성 요구사항)
 
@@ -473,66 +437,13 @@ UFFS 파일시스템은 디렉토리 구조가 스캔 기반 메타레코드로 
 
 ---
 
-## 3.5 Logical database requirements (논리적 데이터 요구사항)
 
-### OTH-DATA-001: 파일시스템 포맷
-**Description**: 시스템은 UFFS 전용 온디스크(on-disk) 포맷을 정의해야 한다.
-
-**Format Structure**:
-```
-+-----------------+
-| Superblock      | (파일시스템 메타정보)
-+-----------------+
-| Inode Table     | (파일/디렉토리 메타데이터)
-+-----------------+
-| Data Blocks     | (실제 파일 데이터)
-+-----------------+
-```
-
-**Superblock Fields**:
-- Magic number (파일시스템 식별)
-- Version
-- Block size
-- Total blocks
-- Free blocks
-- Inode count
-- Mount count
-- Last mount time
-
-**Priority**: Critical
-
----
-
-### OTH-DATA-002: 메타데이터 구조
-**Description**: 시스템은 파일 메타데이터를 정의된 구조로 저장해야 한다.
-
-**Inode Structure**:
-```c
-struct uffs_inode {
-    uint32_t inode_number;
-    uint16_t mode;           // 파일 타입 및 권한
-    uint16_t uid;            // 소유자 UID
-    uint16_t gid;            // 그룹 GID
-    uint64_t size;           // 파일 크기
-    uint64_t atime;          // 접근 시간
-    uint64_t mtime;          // 수정 시간
-    uint64_t ctime;          // 변경 시간
-    uint32_t block_pointers[N]; // 데이터 블록 포인터
-    uint32_t checksum;       // 메타데이터 체크섬
-};
-```
-
-**Priority**: Critical
-
----
-
-## 3.6 Design constraints (설계 제약사항)
+## 3.5 Design constraints (설계 제약사항)
 
 ### OTH-LEG-001: 오픈소스 라이선스
 **Description**: 시스템은 오픈소스 라이선스를 준수해야 한다.
 
 **License Options**:
-- GPL v2 (libfuse 호환)
 - MIT License
 - BSD License
 
@@ -545,9 +456,9 @@ struct uffs_inode {
 
 ---
 
-## 3.7 Software system attributes (소프트웨어 시스템 속성)
+## 3.6 Software system attributes (소프트웨어 시스템 속성)
 
-### 3.7.1 Reliability and Availability (신뢰성 및 가용성)
+### 3.6.1 Reliability and Availability (신뢰성 및 가용성)
 
 #### NFR-REL-001: 데이터 손실 방지
 **Description**: 시스템은 fsync 호출 후 전원 차단 시 데이터 손실이 발생하지 않아야 한다.
@@ -563,7 +474,7 @@ struct uffs_inode {
 
 ---
 
-## 3.8 Supporting information (지원 정보)
+## 3.7 Supporting information (지원 정보)
 
 ### OTH-INST-001: 빌드 시스템
 **Description**: 시스템은 CMake 기반 빌드 시스템을 제공해야 한다.
@@ -588,8 +499,9 @@ sudo make install
 
 | 검증 방법 | 설명 | 적용 요구사항 예시 |
 |----------|------|-------------------|
-| **Unit Test** | 개별 모듈의 기능 검증 | FR-FILE-001~008, FR-DIR-001~004, FR-META-001 |
-| **Concurrency Test** | 멀티스레드 환경에서의 동시 접근 안전성 검증 | FR-CONC-001, FR-FILE-008 |
+| **Unit Test** | 개별 모듈의 기능 검증 | FR-FILE-001~007, FR-DIR-002~004, FR-META-001 |
+| **Crash Test** | 전원 차단 시뮬레이션 후 재마운트하여 데이터 정합성 검증 | FR-FILE-005, FR-DIR-001 |
+| **Durability Test (Stress Test)** | 반복 power-cut 시나리오(1,000회+)로 내구성 및 데이터 손실 부재 검증 | NFR-REL-001 |
 
 ### 검증 매트릭스 (요약)
 
@@ -598,7 +510,6 @@ sudo make install
 | FR-FILE-001~008| Unit Test | Google Test |
 | FR-DIR-001~004 | Unit Test | Google Test |
 | FR-META-001 | Unit Test | Google Test |
-| FR-CONC-001 | Concurrency Test | 멀티스레드 동시 연산 테스트 |
 | NFR-REL-001 | Stress Test, Crash Test | Power-cut simulator (1,000회+) |
 
 ### VER-001: 크래시 정합성 검증 (핵심)
@@ -619,16 +530,30 @@ sudo make install
 
 ---
 
-### VER-ORACLE-001: write/fsync 검증은 FUSE read 단독에 의존하지 않는다
+### VER-ORACLE-001: write/fsync 검증은 FUSE read 로 진행한다
 
-**Target Requirements**: FR-FILE-004, 005
+**Target Requirements**: FR-FILE-004, FR-FILE-005
 
+**Verification Approach**:
+write/fsync 연산의 내구성 검증 시, 검증 오라클(기준값)은 원시 플래시 블록 직접 읽기가 아닌 **FUSE read 인터페이스**를 통해 획득한다.
+즉, fsync 이후 전원 차단 및 재마운트를 수행한 뒤, 동일 파일에 대해 FUSE read를 호출하여 반환된 데이터를 쓰기 이전에 기록한 기대값과 비교한다.
 
+**Rationale**:
+- 플래시 블록 레이아웃은 UFFS 내부 구현에 종속되므로 테스트가 구현 세부사항에 결합되지 않도록 한다.
+- 사용자 관점에서의 end-to-end 정합성(쓰기 → fsync → 크래시 → 재마운트 → 읽기)을 검증한다.
 
-### VER-ORACLE-002: raw scan 기반 독립 oracle로 교차검증한다
+**Test Procedure**:
+1. 대상 파일에 알려진 데이터를 write/pwrite로 기록한다.
+2. fsync(fd)를 호출하고 반환값이 0임을 확인한다.
+3. 파일시스템 프로세스를 비정상 종료(SIGKILL 또는 power-cut 시뮬레이션)한다.
+4. 파일시스템을 재마운트한다.
+5. FUSE read를 통해 동일 파일을 읽어 기록한 데이터와 바이트 단위로 비교한다.
 
+**Success Criteria**:
+- FUSE read로 반환된 데이터가 fsync 이전 write로 기록한 데이터와 100% 일치해야 한다.
+- 파일 크기 역시 fsync 완료 시점의 크기와 동일해야 한다.
 
-**Target Requirements**: FR-FILE-004, 005
+**Priority**: Critical
 
 ---
 
@@ -645,7 +570,7 @@ sudo make install
 
 ### 최종 릴리즈 인수 기준
 
-**AC-004: 릴리즈 준비 완료**
+**AC-003: 릴리즈 준비 완료**
 - [ ] 모든 기능 요구사항 인수 기준 통과 (AC-001~002)
 - [ ] 문서화 완료 (SRS, 설계서, 사용자 매뉴얼, API 문서)
 - [ ] 라이선스 고지 및 저작권 표시 완료
@@ -714,7 +639,6 @@ sudo make install
 | **UFFS (Ultra-low-cost Flash File System)** | NAND 플래시용 경량 파일시스템 |
 | **VFS (Virtual File System)** | 가상 파일시스템. 리눅스 커널의 파일시스템 추상화 계층 |
 | **Write-Ahead Logging (WAL)** | 선행 기록 로깅. 데이터 변경 전에 로그를 기록하여 복구를 보장하는 기법 |
-// Todo:네임스페이스 추가
 
 ## 5.4 Use Cases and Scenarios (사용 사례)
 
@@ -752,20 +676,17 @@ sudo make install
 |-----------|-------------|---------|----------|-----------------|------|
 | FR-FILE-001 | 파일 열기 | Critical | Unit Test | TC-FILE-001 | TBD |
 | FR-FILE-002 | 파일 생성 | Critical | Unit Test | TC-FILE-002 | TBD |
-| FR-FILE-003 | 파일 읽기 | High | Unit Test | TC-FILE-003 | TBD |
+| FR-FILE-003 | 파일 읽기 | Critical | Unit Test | TC-FILE-003 | TBD |
 | FR-FILE-004 | 파일 쓰기 | Critical | Unit Test | TC-FILE-004 | TBD |
 | FR-FILE-005 | 파일 동기화 (fsync) | Critical | Crash Test | TC-CRASH-005 | TBD |
-| FR-FILE-006 | 파일 이름 변경 (rename) | Critical | Unit Test | TC-FILE-006 | TBD |
-| FR-FILE-007 | 파일 삭제 | Critical | Unit Test | TC-FILE-007 | TBD |
-| FR-FILE-008 | 파일, 폴더 동시성 지원 | Critical | Concurrency Test | TC-CONC-008 | TBD |
-| FR-DIR-001 | 디렉토리 동기화 (fsync) | Critical | Crash Test | TC-CRASH-DIR-001 | TBD |
+| FR-FILE-006 | 파일 이름 변경 (rename) | High | Unit Test | TC-FILE-006 | TBD |
+| FR-FILE-007 | 파일 삭제 | Medium | Unit Test | TC-FILE-007 | TBD |
+| FR-DIR-001 | 디렉토리 동기화 (fsync) | High | Crash Test | TC-CRASH-DIR-001 | TBD |
 | FR-DIR-002 | 디렉토리 읽기 | High | Unit Test | TC-DIR-002 | TBD |
 | FR-DIR-003 | 디렉토리 생성 | High | Unit Test | TC-DIR-003 | TBD |
 | FR-DIR-004 | 디렉토리 삭제 | Medium | Unit Test | TC-DIR-004 | TBD |
-| FR-META-001 | 메타데이터 조회 | High | Unit Test | TC-META-001 | TBD |
-| FR-CONC-001 | 동시 접근 안전성 | Medium | Concurrency Test | TC-CONC-001 | TBD |
+| FR-META-001 | 메타데이터 조회 | Medium | Unit Test | TC-META-001 | TBD |
 | **NFR-REL-001** | **데이터 손실 방지** | **Critical** | **Durability Test** | **TC-REL-001** | **TBD** |
-//Todo: 우선순위 3단계에 맞춰 다시 수정
 **Note**: TBD = To Be Determined (구현 단계에서 결정)
 
 **상태 값**:
@@ -800,9 +721,6 @@ sudo make install
 │  ┌──────────────┬──────────────┬──────────────┐        │
 │  │ File Manager │ Dir Manager  │ Meta Manager │        │
 │  └──────────────┴──────────────┴──────────────┘        │
-│  ┌──────────────┬──────────────┬──────────────┐        │
-│  │Crash Recovery│ ECC Module   │Flash Manager │        │
-│  └──────────────┴──────────────┴──────────────┘        │
 └─────────────────────────────────────────────────────────┘
                            ↓
                     Block I/O API
@@ -820,7 +738,7 @@ sudo make install
 
 | 버전 | 날짜 | 작성자 | 변경 내용 |
 |-----|------|--------|----------|
-| 1.0 | 2026.02.14 | 임재형 | 초안 작성 |
+| 1.0 | 2026.02.22 | 임재형 | 초안 작성 |
 
 
 ---
