@@ -37,11 +37,7 @@ foreach(SCRIPT
     tc_rel_001.sh
 )
     configure_file(${SCRIPT} ${CMAKE_CURRENT_BINARY_DIR}/${SCRIPT} COPYONLY)
-    # 실행 권한 부여
-    file(CHMOD ${CMAKE_CURRENT_BINARY_DIR}/${SCRIPT}
-         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                     GROUP_READ GROUP_EXECUTE
-                     WORLD_READ WORLD_EXECUTE)
+    execute_process(COMMAND chmod +x ${CMAKE_CURRENT_BINARY_DIR}/${SCRIPT})
 endforeach()
 
 message(STATUS "쉘 스크립트 복사됨: build/tests/tc_crash_*.sh, tc_rel_001.sh")
