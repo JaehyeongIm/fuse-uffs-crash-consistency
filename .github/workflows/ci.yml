@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ develop ]
+
+jobs:
+  unit-test:
+    name: Build & Unit Test
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 의존성 설치
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake gcc pkg-config libfuse3-dev fuse3
+
+      - name: CMake 설정
+        working-directory: uffs-crash-consistency
+        run: cmake -B build -S .
+
+      - name: 빌드
+        working-directory: uffs-crash-consistency
+        run: cmake --build build --parallel
+
+      - name: 단위 테스트 (TC-TREE, TC-UTILS)
+        working-directory: uffs-crash-consistency
+        run: ctest --test-dir build --output-on-failure
+
+  mount-test:
+    name: Mount Integration Test
+    runs-on: ubuntu-22.04
+    needs: unit-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 의존성 설치
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake gcc pkg-config libfuse3-dev fuse3
+
+      - name: FUSE 환경 설정
+        run: |
+          sudo modprobe fuse
+          sudo chmod 666 /dev/fuse
+
+      - name: 빌드
+        working-directory: uffs-crash-consistency
+        run: cmake -B build -S . && cmake --build build --parallel
+
+      - name: 마운트 통합 테스트 (TC-MOUNT-001)
+        working-directory: uffs-crash-consistency
+        run: bash tests/test_mount.sh ./build/uffs_mount

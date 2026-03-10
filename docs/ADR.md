@@ -137,9 +137,9 @@ Crash Consistency를 보장하는 방식으로 로그 기반 저널링과 CoW(Co
 CoW 기반의 **Two-Phase Write 프로토콜**을 채택한다.
 
 구체적으로 `seal_byte`를 활용한 2단계 쓰기로 구현한다:
-- Phase 1 (Unseal): 데이터를 새 페이지에 기록, `seal_byte=0x00` 설정
-- Phase 2 (Seal): `seal_byte=0xFE`로 단일 바이트 기록 (원자적 커밋)
-- 복구 시 `seal_byte=0xFE`인 페이지만 신뢰 (마운트 스캔 기반)
+- Phase 1 (Unseal): 데이터를 새 페이지에 기록, `seal_byte=0xFE` 설정
+- Phase 2 (Seal): `seal_byte=0xFC`로 단일 바이트 기록 (원자적 커밋)
+- 복구 시 `seal_byte=0xFC`인 페이지만 신뢰 (마운트 스캔 기반)
 
 이 방식은 NAND Flash의 "0→1 비트 변경 불가" 특성을 활용하여 seal 쓰기의 원자성을 보장한다.
 
@@ -149,3 +149,22 @@ CoW 기반의 **Two-Phase Write 프로토콜**을 채택한다.
 - 크래시 후 마운트 스캔만으로 정합 상태를 복원할 수 있다.
 - 페이지 단위 원자성이 보장되어 중간 상태가 트리에 반영되지 않는다.
 - `uffs-reference`의 TagStore/seal 개념을 계승하되, 구현은 독자적이다 (DR-002 참조).
+
+
+# ADR-006: 테스트 툴 결정
+
+Status: Accepted
+Date: 2026-03-05
+
+## Context
+
+단위 테스트, 통합 테스트, 크래시 테스트에 대한 툴 결정
+
+
+## Decision
+
+단위테스트:cmocka
+통합테스트: pytest 통합 하네스
+스트레스 테스트: fsx
+신뢰도 테스트 : xfstests
+## Consequences

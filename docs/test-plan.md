@@ -2,7 +2,7 @@
 
 **문서 표준**: ISO/IEC/IEEE 29119-3
 **Test Plan ID**: TP-UFFS-001
-**Reference SRS**: SRS v1.0 (2026.02.22)
+**Reference SRS**: SRS v1.0 (2026.03.04)
 **Version**: 0.1
 **Date**: 2026-03-04
 **Status**: Draft
