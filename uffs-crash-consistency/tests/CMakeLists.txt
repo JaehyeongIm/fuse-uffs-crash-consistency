@@ -34,6 +34,7 @@ foreach(SCRIPT
     tc_crash_005.sh
     tc_crash_dir_001.sh
     tc_crash_neg_001.sh
+    tc_crash_file_adv.sh
     tc_rel_001.sh
 )
     configure_file(${SCRIPT} ${CMAKE_CURRENT_BINARY_DIR}/${SCRIPT} COPYONLY)

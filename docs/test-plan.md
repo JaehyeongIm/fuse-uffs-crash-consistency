@@ -24,7 +24,7 @@
 | FR-FILE-001 | 파일 열기 | Integration Test |
 | FR-FILE-002 | 파일 생성 | Integration Test |
 | FR-FILE-003 | 파일 읽기 | Integration Test |
-| FR-FILE-004 | 파일 쓰기 | Integration Test |
+| FR-FILE-004 | 파일 쓰기 | Integration Test + Advanced Crash Test |
 | FR-FILE-005 | 파일 동기화 (fsync) | Crash Test |
 | FR-FILE-006 | 파일 이름 변경 (rename) | Integration Test |
 | FR-FILE-007 | 파일 삭제 | Integration Test |
@@ -127,6 +127,7 @@
 |---------|------|-------------|
 | **Integration Test** | FUSE 핸들러와 UFFS 구현의 통합 기능 검증 | FR-FILE-001~004, 006~007, FR-DIR-002~004, FR-META-001 |
 | **Crash Test** | 전원 차단 시뮬레이션 후 재마운트하여 정합성 검증 | FR-FILE-005, FR-DIR-001 |
+| **Advanced Crash Test** | 다양한 쓰기 패턴(sub-page/cross-block/overwrite/append/multi-file)으로 CoW 경로 망라 검증 | FR-FILE-004, FR-FILE-005 |
 | **Durability Test** | 반복 power-cut 시나리오(1,000회+)로 데이터 손실 부재 검증 | NFR-REL-001 |
 | **Negative Test** | 비보장 경계 확인 (fsync 없는 crash) | FR-FILE-005-3 |
 
@@ -252,6 +253,7 @@ SRS 5.5 RTM의 테스트 케이스 ID와 일치시킨다.
 |-----|------|
 | Unit Test TC 전체 통과 | TC-FILE-001~007, TC-DIR-002~004, TC-META-001 모두 Pass |
 | Crash Test 통과 | TC-CRASH-005, TC-CRASH-DIR-001 Pass |
+| Advanced Crash Test 통과 | TC-CRASH-FILE-ADV S1~S5 전체 Pass |
 | Durability Test 통과 | TC-REL-001: 1,000회 중 데이터 손실 0건 |
 | Critical 미결 결함 없음 | 등록된 Critical 결함이 모두 Closed 상태 |
 
@@ -370,6 +372,62 @@ SRS 5.5 RTM의 테스트 케이스 ID와 일치시킨다.
 ### 기대 결과 / 판정
 - 파일 데이터가 원본과 일치 (sha256 동일)
 - `st_size`가 fsync 완료 시점의 크기와 동일
+
+---
+
+## TC-CRASH-FILE-ADV — 파일 쓰기 Crash Consistency 심층 검증
+
+**Related Requirements**: FR-FILE-004, FR-FILE-005
+
+**목적**: TC-CRASH-005가 단순 순차 쓰기만 검증하는 반면, 본 TC는 CoW 내부 경로(RMW, DATA 블록 할당, 덮어쓰기, 추가 쓰기, 다중 파일)를 망라하여 Crash Consistency를 종합 검증한다.
+
+**사전조건**: uffs 바이너리 빌드 완료, python3 설치됨
+
+**실행 스크립트**: `tc_crash_file_adv.sh` (각 시나리오가 독립 이미지 사용)
+
+### S1 — Sub-page write (100B, RMW CoW 경로)
+
+| 단계 | 내용 |
+|-----|------|
+| 쓰기 | 100B 랜덤 데이터 write + fsync (512B 미만 → RMW 발동) |
+| 크래시 | kill -9 |
+| 검증 | 재마운트 후 파일 크기 100B, SHA256 일치 |
+
+### S2 — Cross-block boundary (20KB, FILE 헤더→DATA 블록 경계)
+
+| 단계 | 내용 |
+|-----|------|
+| 쓰기 | 20KB 랜덤 데이터 write + fsync (15,360B 초과 → DATA 블록 신규 할당) |
+| 크래시 | kill -9 |
+| 검증 | 재마운트 후 파일 크기 20,480B, SHA256 일치 |
+
+### S3 — Overwrite (CoW 최신 버전 선택)
+
+| 단계 | 내용 |
+|-----|------|
+| Phase 1 | 4KB pattern 0xAA write + fsync |
+| Phase 2 | 동일 오프셋에 4KB pattern 0xBB 덮어쓰기 + fsync → kill -9 |
+| 검증 | 재마운트 후 0xBB (최신 버전) 복구 확인 |
+
+### S4 — Append (순차 추가 쓰기 2단계)
+
+| 단계 | 내용 |
+|-----|------|
+| Step 1 | 4KB write + fsync |
+| Step 2 | 4KB O_APPEND write + fsync → kill -9 |
+| 검증 | 재마운트 후 8KB 전체 SHA256 일치 |
+
+### S5 — Multi-file (3개 파일 동시 crash 후 복구)
+
+| 단계 | 내용 |
+|-----|------|
+| 쓰기 | file0, file1, file2 각각 4KB write + fsync (순차) |
+| 크래시 | 마지막 fsync 직후 kill -9 |
+| 검증 | 재마운트 후 3개 파일 모두 SHA256 일치 |
+
+### 기대 결과 / 판정
+- S1~S5 전체 통과 (5/5)
+- 각 시나리오에서 복구 데이터가 원본 SHA256과 일치
 
 ---
 
@@ -537,6 +595,7 @@ SRS 4.2 인수 기준과 1:1 연계한다.
 - [ ] TC-FILE-003 통과 (파일 읽기)
 - [ ] TC-FILE-004 통과 (파일 쓰기)
 - [ ] TC-CRASH-005 통과 (파일 fsync 내구성)
+- [ ] TC-CRASH-FILE-ADV 통과 (S1~S5 Crash Consistency 심층 검증)
 - [ ] TC-FILE-006 통과 (파일 rename)
 - [ ] TC-FILE-007 통과 (파일 삭제)
 - [ ] TC-CRASH-DIR-001 통과 (디렉토리 fsync 내구성)
@@ -548,6 +607,7 @@ SRS 4.2 인수 기준과 1:1 연계한다.
 ## AC-002: 크래시 정합성 인수 기준 (핵심)
 
 - [ ] TC-CRASH-005 — fsync(fd) 이후 데이터 손실 0건
+- [ ] TC-CRASH-FILE-ADV — Sub-page/Cross-block/Overwrite/Append/Multi-file 5개 시나리오 전체 통과
 - [ ] TC-CRASH-DIR-001 — fsync(dirfd) 이후 디렉토리 엔트리 오류 0건
 - [ ] TC-REL-001 — 1,000회 반복 power-cut 시 데이터 손실 0건 (NFR-REL-001)
 - [ ] 크래시 정합성 성공률 100%, 데이터 손실률 0%
