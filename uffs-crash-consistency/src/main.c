@@ -3,6 +3,7 @@
 
 #include "flash.h"
 #include "tree.h"
+#include "gc.h"
 #include "meta.h"
 #include "file.h"
 #include "dir.h"
@@ -46,6 +47,12 @@ static void *uffs_init(struct fuse_conn_info *conn, struct fuse_config *cfg)
     if (tree_build() != 0) {
         fprintf(stderr, "uffs: tree_build failed\n");
         return NULL;
+    }
+
+    /* GC spare 블록 초기화: tree_build 이후 실제 빈 블록을 찾아 등록 */
+    if (gc_init() != 0) {
+        fprintf(stderr, "uffs: gc_init failed (storage full?)\n");
+        /* spare 없어도 마운트는 허용: 읽기 전용으로 동작 가능 */
     }
 
     return NULL;

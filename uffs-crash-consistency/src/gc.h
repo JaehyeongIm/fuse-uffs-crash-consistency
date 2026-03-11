@@ -14,5 +14,10 @@
  *     - Pass 2: obsolete 페이지가 가장 많은 블록 → gc_collect_block
  */
 
+/* tree_build() 완료 후 반드시 호출.
+ * 플래시를 스캔하여 실제 spare 블록을 찾고 flash_set_gc_spare()로 등록한다.
+ * spare 블록을 찾지 못하면 -ENOSPC 반환 (스토리지 완전 소진). */
+int gc_init(void);
+
 int gc_collect_block(int block_id); /* 특정 블록 GC */
 int gc_collect(void);               /* 전역 GC: 최적 victim 선택 */

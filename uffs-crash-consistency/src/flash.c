@@ -9,7 +9,8 @@
 #include <time.h>
 #include <sys/types.h>
 
-static int g_flash_fd = -1;
+static int g_flash_fd    = -1;
+static int g_spare_block = GC_SPARE_BLOCK; /* GC 전용 예비 블록 (rolling) */
 
 /* ─── 내부 헬퍼 ─────────────────────────────────────────── */
 
@@ -196,12 +197,26 @@ int flash_sync(void)
     return 0;
 }
 
+/* ─── flash_get_gc_spare / flash_set_gc_spare ────────────── */
+
+int flash_get_gc_spare(void)
+{
+    return g_spare_block;
+}
+
+void flash_set_gc_spare(int block_id)
+{
+    g_spare_block = block_id;
+}
+
 /* ─── flash_alloc_block ──────────────────────────────────── */
 
 int flash_alloc_block(void)
 {
-    /* Block 0 = magic, Block 1 = root dir; 2 이상에서 빈 블록 탐색 */
+    /* Block 0 = magic, Block 1 = root dir; 2 이상에서 빈 블록 탐색.
+     * g_spare_block은 GC 전용 예비이므로 절대 반환하지 않는다. */
     for (int b = 2; b < TOTAL_BLOCKS; b++) {
+        if (b == g_spare_block) continue;
         uffs_MiniHeader hdr;
         if (flash_read_page(b, 0, &hdr, NULL, NULL) != 0) continue;
         if (hdr.status == 0xFF) return b; /* 0xFF = 미사용 블록 */

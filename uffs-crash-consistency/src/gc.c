@@ -5,6 +5,31 @@
 #include <string.h>
 #include <errno.h>
 
+/* ─── gc_init ────────────────────────────────────────────── */
+/*
+ * tree_build() 완료 후 호출. 플래시를 역방향 스캔하여 실제 spare 블록을
+ * 찾고 flash_set_gc_spare()로 등록한다.
+ *
+ * 왜 역방향(TOTAL_BLOCKS-1 → 2)인가:
+ *   최초 포맷 시 block 127(GC_SPARE_BLOCK)이 비어있다.
+ *   GC rolling 이후에는 다른 번호의 블록이 spare가 될 수 있으므로
+ *   전체 스캔으로 실제 빈 블록을 찾는다.
+ */
+int gc_init(void)
+{
+    for (int b = TOTAL_BLOCKS - 1; b >= 2; b--) {
+        uffs_MiniHeader hdr;
+        if (flash_read_page(b, 0, &hdr, NULL, NULL) != 0) continue;
+        if (hdr.status == 0xFF) {
+            flash_set_gc_spare(b);
+            return 0;
+        }
+    }
+    /* 빈 블록이 전혀 없음: 스토리지 완전 소진 */
+    flash_set_gc_spare(-1);
+    return -ENOSPC;
+}
+
 /* ─── 내부 헬퍼 ─────────────────────────────────────────── */
 
 /* 블록이 실제 사용 중(page 0 status != 0xFF)인지 확인 */
@@ -48,11 +73,16 @@ static int count_obsolete_pages(int block_id)
  * 특정 블록을 GC한다.
  * - 유효 페이지(SEAL_DONE && dirty==1)가 없으면 바로 erase.
  * - 유효 페이지가 있으면:
- *     1. 새 블록 할당
- *     2. logical_pg별 최신 유효 물리 페이지를 새 블록에 순차 복사
+ *     1. GC 전용 spare 블록 사용 (flash_alloc_block 대신 → 데드락 방지)
+ *     2. logical_pg별 최신 유효 물리 페이지를 spare 블록에 순차 복사
  *        (block_ts를 modulo-3으로 1 증가)
- *     3. tree_update_block_id(old, new)
- *     4. 구 블록 erase
+ *     3. tree_update_block_id(old, spare)
+ *     4. 구 블록 erase → 구 블록이 새 spare (rolling spare)
+ *
+ * Rolling spare 원리:
+ *   spare_before → live 페이지 복사 목적지
+ *   victim 블록 → erase 후 새 spare
+ *   flash_alloc_block은 spare를 제외하고 탐색하므로 항상 1개 여유 보장
  */
 int gc_collect_block(int block_id)
 {
@@ -60,8 +90,8 @@ int gc_collect_block(int block_id)
     if (count_valid_pages(block_id) == 0)
         return flash_erase_block(block_id);
 
-    /* 새 블록 할당 */
-    int new_blk = flash_alloc_block();
+    /* GC 전용 spare 블록 사용 (flash_alloc_block 대신) */
+    int new_blk = flash_get_gc_spare();
     if (new_blk < 0) return -ENOSPC;
 
     /* 구 블록 block_ts 읽기 */
@@ -115,12 +145,16 @@ int gc_collect_block(int block_id)
         new_p++;
     }
 
-    /* 트리 갱신 및 구 블록 erase */
+    /* 트리 갱신 후 구 블록 erase → 구 블록이 새 spare (rolling) */
     tree_update_block_id(block_id, new_blk);
-    return flash_erase_block(block_id);
+    if (flash_erase_block(block_id) != 0) goto fail;
+    flash_set_gc_spare(block_id); /* 구 블록이 다음 GC의 spare */
+    return 0;
 
 fail:
+    /* 복사 도중 실패: spare 블록 내용을 erase해 spare 상태로 복원 */
     flash_erase_block(new_blk);
+    /* g_spare_block은 여전히 new_blk이므로 spare 상태 유지됨 */
     return -EIO;
 }
 

@@ -16,6 +16,10 @@ typedef uint32_t u32;
 #define TOTAL_BLOCKS        128
 #define MAX_FILENAME_LEN    488          /* PAGE_DATA_SIZE - 24 */
 
+/* GC 전용 예비 블록 초기값 (flash_alloc_block이 절대 반환하지 않음).
+ * 실제 spare는 GC 이후 rolling 되므로 flash_get_gc_spare() 로 조회해야 함. */
+#define GC_SPARE_BLOCK      (TOTAL_BLOCKS - 1)   /* block 127 */
+
 /* ─── Seal byte 값 (SDD §4.3) ────────────────────────────── */
 #define SEAL_EMPTY          0xFF         /* 빈 페이지 */
 #define SEAL_WRITING        0xFE         /* 쓰기 진행 중 (Unseal) */
@@ -43,10 +47,13 @@ typedef uint32_t u32;
 #define PAGE_SEAL_BYTE_OFF   526         /* 4 + 512 + 8 + 2 */
 
 /* ─── 파일 데이터 용량 상수 ──────────────────────────────── */
-#define FILE_HEADER_DATA_PAGES  31       /* FILE 블록 pages 1..31 */
-#define DATA_BLOCK_PAGES        32       /* DATA 블록 pages 0..31 */
-#define MAX_DATA_IN_HEADER      (FILE_HEADER_DATA_PAGES * PAGE_DATA_SIZE)   /* 15872 */
-#define MAX_DATA_PER_DATABLOCK  (DATA_BLOCK_PAGES * PAGE_DATA_SIZE)          /* 16384 */
+/* page 31은 CoW 예비 슬롯으로 예약: 블록이 꽉 찼을 때 CoW 쓰기용 물리 슬롯 확보.
+ * GC 후 새 블록에는 최대 30(FILE) / 31(DATA) 개의 live 페이지가 복사되므로
+ * physical page 31이 항상 비어있어 CoW 연쇄가 끊기지 않는다. */
+#define FILE_HEADER_DATA_PAGES  30       /* FILE 블록 pages 1..30; page 31 = CoW 예비 */
+#define DATA_BLOCK_PAGES        31       /* DATA 블록 pages 0..30; page 31 = CoW 예비 */
+#define MAX_DATA_IN_HEADER      (FILE_HEADER_DATA_PAGES * PAGE_DATA_SIZE)   /* 15360 */
+#define MAX_DATA_PER_DATABLOCK  (DATA_BLOCK_PAGES * PAGE_DATA_SIZE)          /* 15872 */
 
 /* ─── 온디스크 구조체 ────────────────────────────────────── */
 
@@ -113,7 +120,11 @@ int flash_write_page_unsealed(int block_id, int page_id,
 
 int flash_seal_page(int block_id, int page_id);
 int flash_sync(void);
-int flash_alloc_block(void);        /* 빈 블록 ID 반환; -ENOSPC on full */
+int flash_alloc_block(void);        /* 빈 블록 ID 반환; -ENOSPC on full. GC spare 블록 제외 */
 int flash_alloc_page(int block_id); /* 블록 내 다음 빈 물리 페이지 반환; -1이면 블록 가득 참 */
 int flash_obsolete_page(int block_id, int page_id); /* tag.s.dirty 1→0 flip (NAND 호환) */
 int flash_erase_block(int block_id);                /* 블록 전체를 0xFF로 초기화 (GC용) */
+
+/* GC 전용 예비 블록 관리 (gc.c 에서만 사용) */
+int flash_get_gc_spare(void);         /* 현재 spare 블록 ID 반환 */
+void flash_set_gc_spare(int block_id); /* spare 블록 ID 갱신 (rolling spare) */
