@@ -13,18 +13,18 @@
 
 # 1. 요약 (Executive Summary)
 
-2026-03-11에 FUSE 기반 UFFS 파일시스템에 대한 통합 테스트, Crash Test, Durability Test, 음성 테스트를 수행하였다.
-계획된 12개 TC 전체가 실행되었으며, 판정 대상 11개가 모두 통과하였다.
-핵심 품질 목표인 **Crash Consistency**는 파일(1MB·4KB)과 디렉토리 엔트리 양방향으로 검증되었고,
+2026-03-11에 FUSE 기반 UFFS 파일시스템에 대한 통합 테스트, Crash Test, Advanced Crash Test, Durability Test, 음성 테스트를 수행하였다.
+계획된 13개 TC 전체가 실행되었으며, 판정 대상 12개가 모두 통과하였다.
+핵심 품질 목표인 **Crash Consistency**는 파일(1MB·4KB), 서브페이지/크로스블록/덮어쓰기/추가쓰기/멀티파일 등 5가지 고급 시나리오, 디렉토리 엔트리 양방향으로 검증되었고,
 **NFR-REL-001** (1,000회 반복 power-cut 시 데이터 손실 0건)이 완전히 충족되었다.
 TC-CRASH-NEG-001(음성 테스트)에서는 fsync 미호출 크래시 시 파일이 복구되지 않음(size=0)이 관측되어
 SRS FR-FILE-005-3의 비보장 경계가 문서화되었다.
 
 | 항목 | 결과 |
 |------|------|
-| 계획 TC 수 | 12개 |
-| 실행 TC 수 | **12 / 12 (100%)** |
-| 통과 (판정 대상) | **11 / 11 (100%)** |
+| 계획 TC 수 | 13개 |
+| 실행 TC 수 | **13 / 13 (100%)** |
+| 통과 (판정 대상) | **12 / 12 (100%)** |
 | 실패 | 0 |
 | 관측 전용 (판정 없음) | 1 (TC-CRASH-NEG-001) |
 | 데이터 손실 (1,000회 반복) | **0건 (0%)** |
@@ -72,6 +72,7 @@ SRS FR-FILE-005-3의 비보장 경계가 문서화되었다.
 | TC-REL-001 (1,000회) | 2026-03-11 09:24:36 ~ 09:28:48 |
 | TC-CRASH-DIR-001 | 2026-03-11 오전 |
 | TC-CRASH-NEG-001 | 2026-03-11 오전 |
+| TC-CRASH-FILE-ADV | 2026-03-11 오전 |
 
 ## 3.2 TC별 판정 요약
 
@@ -91,6 +92,7 @@ SRS FR-FILE-005-3의 비보장 경계가 문서화되었다.
 | TC-REL-001 | fsync 내구성 반복 | NFR-REL-001 | **PASS** | 1,000회 손실 0건 |
 | TC-CRASH-DIR-001 | fsync 후 크래시 내구성 (디렉토리) | FR-DIR-001 | **PASS** | 엔트리 보존 확인 |
 | TC-CRASH-NEG-001 | fsync 이전 크래시 (비보장) | FR-FILE-005-3 | **관측 완료** | 판정 대상 아님 |
+| TC-CRASH-FILE-ADV | 고급 크래시 정합성 (5 시나리오) | FR-FILE-004, FR-FILE-005 | **PASS** | 5 / 5 서브시나리오 전체 통과 |
 
 ---
 
@@ -324,14 +326,107 @@ TC-CRASH-NEG-001 완료 (음성 테스트, 판정 없음)
 
 ---
 
+## 4.6 TC-CRASH-FILE-ADV — 고급 크래시 정합성 (5 시나리오)
+
+**실행 명령어**
+```
+UFFS_BIN=../uffs bash tc_crash_file_adv.sh
+```
+
+**실행 로그**
+```
+[INFO] TC-CRASH-FILE-ADV 시작 (5개 시나리오)
+[INFO] ══════════════════════════════════════════
+[INFO] S1: Sub-page write (100B, RMW 경로)
+[INFO] ──────────────────────────────────────────
+[INFO] S1 마운트
+[INFO] S1 write 100B + fsync
+[INFO] S1 원본 SHA256: 89b63fc1aa08922282e6872f86a8c362aa16fe7bcb3f304e567a183902def6cd
+[INFO] S1 kill -9 크래시
+[INFO] S1 재마운트
+[INFO] S1 복구 SHA256: 89b63fc1aa08922282e6872f86a8c362aa16fe7bcb3f304e567a183902def6cd
+[INFO] S1 복구 size: 100
+[PASS] S1 Sub-page write: 원본/복구 SHA256 일치, 크기 100B 일치
+[INFO] ══════════════════════════════════════════
+[INFO] S2: Cross-block write (20KB, DATA 블록 경계 돌파)
+[INFO] ──────────────────────────────────────────
+[INFO] S2 마운트
+[INFO] S2 write 20480B + fsync
+[INFO] S2 원본 SHA256: fbfc93184996fbce081f00575d8e52cd6bb7340e0262c40a3907dddd0ef4dde6
+[INFO] S2 kill -9 크래시
+[INFO] S2 재마운트
+[INFO] S2 복구 SHA256: fbfc93184996fbce081f00575d8e52cd6bb7340e0262c40a3907dddd0ef4dde6
+[INFO] S2 복구 size: 20480
+[PASS] S2 Cross-block write: 원본/복구 SHA256 일치, 크기 20480B 일치
+[INFO] ══════════════════════════════════════════
+[INFO] S3: Overwrite (CoW 버전 선택 검증)
+[INFO] ──────────────────────────────────────────
+[INFO] S3 마운트
+[INFO] S3 Pattern A (0xAA) write + fsync
+[INFO] S3 Pattern A SHA256: c622005493c4cb75f3e08eda4cc0bfe172e2c5eeca661ec4908c5490fc3d6994
+[INFO] S3 Pattern B (0xBB) overwrite + fsync
+[INFO] S3 Pattern B SHA256: 15e4f1aac8507317040181a8e042bd52fa7fe29e0cf390775cd4e43d01fc5c4b
+[INFO] S3 kill -9 크래시
+[INFO] S3 재마운트
+[INFO] S3 복구 SHA256: 15e4f1aac8507317040181a8e042bd52fa7fe29e0cf390775cd4e43d01fc5c4b
+[INFO] S3 복구 size: 4096
+[PASS] S3 Overwrite: 최신 버전(Pattern B) SHA256 일치, 크기 4096B 일치
+[INFO] ══════════════════════════════════════════
+[INFO] S4: Append write (8KB, 파일 크기 확장)
+[INFO] ──────────────────────────────────────────
+[INFO] S4 마운트
+[INFO] S4 chunk1 (4096B) write + fsync
+[INFO] S4 chunk2 (4096B) append + fsync
+[INFO] S4 전체 SHA256: 47e2410cea7ddc8c238c01c2f4b5397de216dd1b180105d56da004482a3eaf17
+[INFO] S4 kill -9 크래시
+[INFO] S4 재마운트
+[INFO] S4 복구 SHA256: 47e2410cea7ddc8c238c01c2f4b5397de216dd1b180105d56da004482a3eaf17
+[INFO] S4 복구 size: 8192
+[PASS] S4 Append write: 원본/복구 SHA256 일치, 크기 8192B 일치
+[INFO] ══════════════════════════════════════════
+[INFO] S5: Multi-file (파일 3개 동시 내구성)
+[INFO] ──────────────────────────────────────────
+[INFO] S5 마운트
+[INFO] S5 file0/file1/file2 각 4096B write + fsync
+[INFO] S5 원본 SHA256 — file0: eee47cb7671b77b0eed36e571deabae95facb5f906a63bbfd5019239441a894a
+[INFO] S5 원본 SHA256 — file1: b98cd7fc875a90b6aa9ae6a70a55a8d10bcf35efc1b1b24f7936bd4b5aff3985
+[INFO] S5 원본 SHA256 — file2: 3d3057648c5b1f242b01714862a16e5834d5f3077cf8bcfbc129f27259341a3b
+[INFO] S5 kill -9 크래시
+[INFO] S5 재마운트
+[INFO] S5 file0: SHA256 일치 (4096B OK)
+[INFO] S5 file1: SHA256 일치 (4096B OK)
+[INFO] S5 file2: SHA256 일치 (4096B OK)
+[PASS] S5 Multi-file: 3개 파일 모두 원본/복구 SHA256 일치
+[INFO] ══════════════════════════════════════════
+
+──────────────────────────────────────────
+TC-CRASH-FILE-ADV 최종 결과
+──────────────────────────────────────────
+[PASS] 5 / 5 시나리오 통과
+[PASS] TC-CRASH-FILE-ADV: 모든 고급 크래시 정합성 시나리오 통과
+```
+
+| 시나리오 | 검증 내용 | 크기 | SHA256 일치 | 판정 |
+|---------|---------|------|-----------|------|
+| S1 Sub-page (100B) | RMW 경로 | 100 B | `89b63fc1…` | **PASS** |
+| S2 Cross-block (20KB) | DATA 블록 경계 돌파 | 20,480 B | `fbfc9318…` | **PASS** |
+| S3 Overwrite (CoW) | 최신 버전 선택 | 4,096 B | `15e4f1aa…` (Pattern B) | **PASS** |
+| S4 Append (8KB) | 파일 크기 확장 | 8,192 B | `47e2410c…` | **PASS** |
+| S5 Multi-file (×3) | 3파일 독립 내구성 | 각 4,096 B | file0/1/2 모두 일치 | **PASS** |
+| **종합** | — | — | **5 / 5** | **PASS** |
+
+**판정**: **PASS** — 5개 고급 크래시 정합성 시나리오 전체 통과
+
+---
+
 # 5. 테스트 지표 (Testing Metrics)
 
 | 지표 | 계산식 | 결과 | 목표 | 충족 여부 |
 |-----|-------|------|------|---------|
-| TC 실행률 | 12 / 12 × 100 | **100%** | 100% | ✅ |
-| TC 통과율 (판정 대상) | 11 / 11 × 100 | **100%** | 100% | ✅ |
+| TC 실행률 | 13 / 13 × 100 | **100%** | 100% | ✅ |
+| TC 통과율 (판정 대상) | 12 / 12 × 100 | **100%** | 100% | ✅ |
 | 데이터 손실률 (1,000회) | 0 / 1,000 × 100 | **0%** | 0% | ✅ |
-| 크래시 정합성 성공률 | 3 / 3 × 100 | **100%** | 100% | ✅ |
+| 크래시 정합성 성공률 | 4 / 4 × 100 | **100%** | 100% | ✅ |
 | Critical 결함 수 | — | **0건** | 0건 | ✅ |
 | 크기 불일치 (1,000회) | 0 / 1,000 × 100 | **0%** | 0% | ✅ |
 
@@ -345,6 +440,7 @@ test-plan.md §5.2 정상 종료 기준과 대조한다.
 |-----|------|---------|
 | Unit Test TC 전체 통과 | TC-FILE-001~007, TC-DIR-002~004, TC-META-001 모두 Pass | ✅ 10 / 10 |
 | Crash Test 통과 | TC-CRASH-005, TC-CRASH-DIR-001 Pass | ✅ |
+| Advanced Crash Test 통과 | TC-CRASH-FILE-ADV: 5 / 5 시나리오 Pass | ✅ |
 | Durability Test 통과 | TC-REL-001: 1,000회 중 데이터 손실 0건 | ✅ |
 | Critical 미결 결함 없음 | Critical 결함 0건 | ✅ |
 
@@ -373,6 +469,7 @@ test-plan.md §7 인수 기준과 대조한다.
 
 - [x] TC-CRASH-005 — fsync(fd) 이후 데이터 손실 0건
 - [x] TC-CRASH-DIR-001 — fsync(dirfd) 이후 디렉토리 엔트리 오류 0건
+- [x] TC-CRASH-FILE-ADV — 서브페이지·크로스블록·덮어쓰기·추가쓰기·멀티파일 5시나리오 모두 통과
 - [x] TC-REL-001 — 1,000회 반복 power-cut 시 데이터 손실 0건 (NFR-REL-001)
 - [x] 크래시 정합성 성공률 100%, 데이터 손실률 0%
 
@@ -405,8 +502,9 @@ test-plan.md §7 인수 기준과 대조한다.
 
 FUSE 기반 UFFS 파일시스템은 핵심 품질 목표인 **Crash Consistency**를 달성하였다.
 
-- **기능 정확성**: 11개 판정 대상 TC 전체 통과 (100%)
+- **기능 정확성**: 12개 판정 대상 TC 전체 통과 (100%)
 - **Crash Consistency (파일)**: 1MB 및 4KB 파일에 대한 fsync 후 kill -9 크래시에서 SHA256 완전 일치
+- **Crash Consistency (고급)**: 서브페이지(100B RMW), 크로스블록(20KB), 덮어쓰기(CoW 버전 선택), 추가쓰기(8KB), 멀티파일(3파일) 5가지 시나리오 모두 SHA256 완전 일치
 - **Crash Consistency (디렉토리)**: fsync(dirfd) 후 kill -9 크래시에서 디렉토리 엔트리 및 파일 내용 완전 보존
 - **내구성 (NFR-REL-001)**: 1,000회 반복 power-cut 시나리오에서 데이터 손실 **0건 (손실률 0%)**
 - **비보장 경계 확인**: fsync 미호출 크래시 시 데이터 손실 발생 — SRS FR-FILE-005-3에 명시된 비보장 동작으로 확인
@@ -424,4 +522,4 @@ FUSE 기반 UFFS 파일시스템은 핵심 품질 목표인 **Crash Consistency*
 
 | 버전 | 날짜 | 작성자 | 변경 내용 |
 |-----|------|--------|----------|
-| 1.0 | 2026-03-11 | 임재형 | 최초 작성 — 12개 TC 전체 실행 결과 수록 (통합 10종, TC-CRASH-005 x2, TC-REL-001 x4, TC-CRASH-DIR-001, TC-CRASH-NEG-001 관측) |
+| 1.0 | 2026-03-11 | 임재형 | 최초 작성 — 12개 TC 전체 실행 결과 수록 (통합 10종, TC-CRASH-005 x2, TC-REL-001 x4, TC-CRASH-DIR-001, TC-CRASH-NEG-001 관측); TC-CRASH-FILE-ADV (5시나리오 PASS) 추가 — 13개 TC 완료 |
