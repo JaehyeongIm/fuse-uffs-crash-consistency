@@ -5,7 +5,7 @@
 - **Project Name**: FUSE 기반 UFFS 파일시스템
 - **Domain**: User-space filesystem over FUSE (libfuse 3.18.1)
 - **Primary Goal**: Crash Consistency 보장 및 검증 (신뢰성 우선, 성능 비목표)
-- **SRS**: v1.0 (2026.02.22)
+- **SRS**: v1.0 (2026.03.04)
 - **SDD**: v1.0 (2026.03.04)
 - **Test Plan**: TP-UFFS-001 v0.1 (2026.03.04)
 
