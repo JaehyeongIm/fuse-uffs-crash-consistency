@@ -98,14 +98,14 @@
 | **Block** | 페이지의 집합. 32 페이지/블록. 씰(Seal) 단위 |
 | **TagStore** | 페이지의 스페어 영역에 저장되는 8바이트 메타데이터 구조체 |
 | **Tag** | TagStore(8B) + data_sum(2B) + seal_byte(1B) = 12B |
-| **seal_byte** | 페이지 씰 상태 표시자. 0xFF=빈 페이지, 0xFE=쓰기 중(Unseal), 0xFC=씰 완료(Sealed) |
+| **seal_byte** | 페이지 씰 상태 표시자. 0xFF=빈 페이지, 0x00=쓰기 중(Unseal), 0xFE=완료(Sealed) |
 | **Serial** | 파일/디렉토리를 식별하는 14비트 고유 번호 |
 | **Parent** | 파일/디렉토리가 속한 상위 디렉토리의 시리얼 번호 (10비트) |
 | **File Header Block** | 파일의 메타데이터(UffsFileInfo)와 파일 데이터를 담는 블록. page 0 = 메타, pages 1~31 = 데이터 |
 | **Data Block** | 파일 데이터 전용 블록. parent = 해당 파일의 serial |
 | **Dir Block** | 디렉토리 메타데이터를 담는 블록. page 0 = UffsFileInfo |
-| **Sealed** | seal_byte=0xFC인 페이지. 크래시 후에도 신뢰할 수 있는 상태 |
-| **Unseal** | seal_byte=0xFE인 페이지. 쓰기 진행 중이거나 크래시로 인해 미완료된 상태 |
+| **Sealed** | seal_byte=0xFE인 페이지. 크래시 후에도 신뢰할 수 있는 상태 |
+| **Unseal** | seal_byte=0x00인 페이지. 쓰기 진행 중이거나 크래시로 인해 미완료된 상태 |
 | **Two-phase Write** | 데이터 기록(Unseal) → 씰 확정(Sealed) 순서로 크래시 정합성을 보장하는 쓰기 프로토콜 |
 | **Global Lock** | FUSE 콜백 전체를 직렬화하는 단일 뮤텍스 |
 | **TreeNode** | 인메모리 트리의 노드. dir/file/data 유니온 타입 |
@@ -300,7 +300,7 @@ dir_mkdir(path, mode):
   2. new_serial = tree_alloc_serial()
   3. UffsFileInfo 초기화 (name, attr = FILE_ATTR_DIR)
   4. flash_alloc_block() → dir_block_id
-  5. flash_write_page_unsealed(dir_block_id, 0, &dir_info)  ← seal_byte=0xFE
+  5. flash_write_page_unsealed(dir_block_id, 0, &dir_info)
   6. tree_insert_dir(new_serial, parent_serial, dir_block_id)
   7. return 0
 ```
@@ -389,7 +389,7 @@ void tree_enumerate_children(u16 parent_serial, TreeNode **out, int *count);
 tree_build(flash_fd):
   for each block in [1, TOTAL_BLOCKS]:
     tag = read_tag(block, page=0)
-    if tag.seal_byte != SEAL_DONE (0xFC): skip  // 씰되지 않은 블록 무시
+    if tag.seal_byte != SEAL_DONE: skip  // 씰되지 않은 블록 무시
     if tag.s.type == UFFS_TYPE_DIR:
       dir_info = read_page_data(block, 0)
       tree_insert_dir(tag.s.serial, tag.s.parent, block, dir_info.name)
@@ -428,7 +428,7 @@ flash_write_page_unsealed(block_id, page_id, data, len, tag_tmpl):
   1. page_buf 구성:
      - MiniHeader: {status=0x01, reserved=0, crc=crc16(data)}
      - Data: data (512B, 나머지 0 패딩)
-     - Tag: tag_tmpl 복사, seal_byte=0xFE (Unseal)
+     - Tag: tag_tmpl 복사, seal_byte=0x00 (Unseal)
   2. pwrite(flash_fd, page_buf, PAGE_SIZE, offset)
   3. return 0 or -errno
 ```
@@ -438,7 +438,7 @@ flash_write_page_unsealed(block_id, page_id, data, len, tag_tmpl):
 ```
 flash_seal_page(block_id, page_id):
   1. offset = 블록/페이지 오프셋 + TAG 영역 + seal_byte 위치
-  2. seal_val = SEAL_DONE (0xFC)
+  2. seal_val = SEAL_DONE (0xFE)
   3. pwrite(flash_fd, &seal_val, 1, seal_offset)
   4. return 0 or -errno
 ```
@@ -457,7 +457,7 @@ flash_seal_page(block_id, page_id):
 │
 ├── Block 1  [Root Directory Block]
 │   └── Page 0: UffsFileInfo (name="/", attr=DIR, serial=0xFF, parent=0xFF)
-│            seal_byte = SEAL_DONE (0xFC)
+│            seal_byte = SEAL_DONE (0xFE)
 │
 ├── Block 2~N  [File/Dir/Data Blocks]
 │   └── 각 블록의 Page 0의 TagStore.type으로 블록 용도 결정
@@ -539,8 +539,8 @@ struct uffs_TagsSt {
 | 값 | 상수명 | 의미 |
 |---|-------|-----|
 | `0xFF` | `SEAL_EMPTY` | 빈 페이지 (미사용) |
-| `0xFE` | `SEAL_WRITING` | 쓰기 진행 중, 아직 씰되지 않음 (Unseal) |
-| `0xFC` | `SEAL_DONE` | 씰 완료, 크래시 후에도 신뢰 가능 |
+| `0x00` | `SEAL_WRITING` | 데이터 기록 완료, 아직 씰되지 않음 |
+| `0xFE` | `SEAL_DONE` | 씰 완료, 크래시 후에도 신뢰 가능 |
 
 ## 4.4 Seal Mechanism (씰 메커니즘)
 
@@ -548,13 +548,13 @@ UFFS는 NAND 플래시의 특성(비트를 0→1로 되돌릴 수 없음)을 활
 
 ```
 쓰기 시퀀스:
-  1. pwrite(data + tag with seal_byte=0xFE)   ← Unseal 상태 (쓰기 진행 중)
+  1. pwrite(data + tag with seal_byte=0x00)   ← Unseal 상태
   2. [크래시 가능 구간]
-  3. pwrite(seal_byte=0xFC at tag offset)     ← Sealed 상태 (씰 완료)
+  3. pwrite(seal_byte=0xFE at tag offset)     ← Sealed 상태
 
 복구 시:
-  - seal_byte=0xFC  → 신뢰, 인메모리 트리에 포함
-  - seal_byte=0xFE  → 크래시로 인해 씰 미완료, 무시
+  - seal_byte=0xFE  → 신뢰, 인메모리 트리에 포함
+  - seal_byte=0x00  → 크래시로 인해 미완료, 무시
   - seal_byte=0xFF  → 빈 페이지, 무시
 ```
 
@@ -621,16 +621,16 @@ g_tree (UffsTree)
 ```
 Phase 1 (Unseal Write):
   flash_write_page_unsealed(block_id, page_id, data)
-  → seal_byte = 0xFE로 페이지 기록 (쓰기 진행 중)
+  → seal_byte = 0x00으로 페이지 기록
   → 이 시점에 크래시가 발생하면 마운트 스캔에서 무시됨
 
 Phase 2 (Seal Commit):
   flash_seal_page(block_id, page_id)
-  → seal_byte = 0xFC로 갱신 (단일 바이트 기록)
+  → seal_byte = 0xFE로 갱신 (단일 바이트 기록)
   → 이 시점 이후 크래시가 발생해도 마운트 스캔에서 인식됨
 ```
 
-**핵심 불변식**: seal_byte=0xFC인 페이지만 마운트 스캔에서 신뢰한다.
+**핵심 불변식**: seal_byte=0xFE인 페이지만 마운트 스캔에서 신뢰한다.
 
 ## 5.2 Mount Scan Recovery (마운트 스캔 복구)
 
@@ -639,7 +639,7 @@ Phase 2 (Seal Commit):
 ```
 for each block B in [1, TOTAL_BLOCKS-1]:
   tag = read_tag(B, page_id=0)
-  if tag.seal_byte != SEAL_DONE (0xFC):
+  if tag.seal_byte != SEAL_DONE (0xFE):
     continue  // Unseal, Empty 블록 무시
   file_info = read_data(B, page_id=0)
   switch tag.s.type:
@@ -758,7 +758,7 @@ SRS §5.4 UC-001의 설계 수준 흐름.
     2. new_serial = tree_alloc_serial() = 1
     3. UffsFileInfo{name="test.txt", attr=FILE_ATTR_WRITE, ...}
     4. block_id = flash_alloc_block(FILE, serial=1, parent=0xFF) = 3
-    5. flash_write_page_unsealed(3, 0, &file_info)  ← seal_byte=0xFE
+    5. flash_write_page_unsealed(3, 0, &file_info)  ← seal_byte=0x00
     6. tree_insert_file(serial=1, parent=0xFF, block_id=3, "test.txt")
   → [g_lock 해제]
   → return fd
@@ -768,7 +768,7 @@ SRS §5.4 UC-001의 설계 수준 흐름.
   → [g_lock 획득]
   → file_write("/mnt/uffs/test.txt", "Hello", 5, offset=0)
     1. page_id = 0 / PAGE_DATA_SIZE = 0 → block 3, page 1 (Page 0은 헤더)
-    2. flash_write_page_unsealed(3, 1, "Hello\0...", 5)  ← seal_byte=0xFE
+    2. flash_write_page_unsealed(3, 1, "Hello\0...", 5)  ← seal_byte=0x00
     3. g_tree.files[0].size = 5
   → [g_lock 해제]
   → return 5
@@ -777,10 +777,10 @@ SRS §5.4 UC-001의 설계 수준 흐름.
   → VFS → FUSE fsync 콜백
   → [g_lock 획득]
   → file_fsync("/mnt/uffs/test.txt", ...)
-    1. flash_seal_page(3, 1)          ← 데이터 씰 (seal_byte=0xFC)
+    1. flash_seal_page(3, 1)          ← 데이터 씰 (seal_byte=0xFE)
     2. update file_info.last_modify, data_len
     3. flash_write_page_unsealed(3, 0, &updated_file_info)
-    4. flash_seal_page(3, 0)          ← 헤더 씰 (seal_byte=0xFC)
+    4. flash_seal_page(3, 0)          ← 헤더 씰 (seal_byte=0xFE)
     5. flash_sync()                   ← fdatasync()
   → [g_lock 해제]
   → return 0   ← 이 시점부터 내구성 보장 (FR-FILE-005)
@@ -850,8 +850,8 @@ fuse-uffs/
 
 // Seal byte values
 #define SEAL_EMPTY          0xFF
-#define SEAL_WRITING        0xFE
-#define SEAL_DONE           0xFC
+#define SEAL_WRITING        0x00
+#define SEAL_DONE           0xFE
 
 // Block types (uffs_TagStoreSt.type)
 #define UFFS_TYPE_DIR       1
@@ -909,4 +909,3 @@ add_subdirectory(tests)
 | 버전 | 날짜 | 작성자 | 변경 내용 |
 |-----|-----|------|---------|
 | 1.0 | 2026.03.04 | 임재형 | 초안 작성 (IEEE 1016-2009 기반) |
-| 1.1 | 2026.03.05 | 임재형 | seal_byte 값 재정의: SEAL_WRITING 0x00→0xFE, SEAL_DONE 0xFE→0xFC (NAND 비트 단방향 특성 반영) |
