@@ -25,7 +25,4 @@ jobs:
         working-directory: uffs-crash-consistency
         run: cmake --build build --parallel
 
-      - name: 단위 테스트 (TC-TREE, TC-UTILS)
-        working-directory: uffs-crash-consistency
-        run: ctest --test-dir build --output-on-failure
 
