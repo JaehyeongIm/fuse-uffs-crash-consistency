@@ -3,7 +3,7 @@
 
 **문서 표준**: ISO/IEC/IEEE 29148
 **버전(Version)**: 1.0
-**작성일(Date)**: 2026.02.22
+**작성일(Date)**: 2026.03.04
 **작성자(Author)**: 임재형
 
 ---
@@ -36,6 +36,10 @@
       - [FR-FILE-002: 파일 생성](#fr-file-002-파일-생성)
       - [FR-FILE-003: 파일 읽기](#fr-file-003-파일-읽기)
       - [FR-FILE-004: 파일 쓰기](#fr-file-004-파일-쓰기)
+      - [FR-FILE-004-1: 대용량 파일 쓰기 지원](#fr-file-004-1-대용량-파일-쓰기-지원)
+      - [FR-FILE-004-2: 공간 부족 시 자동 공간 회수](#fr-file-004-2-공간-부족-시-자동-공간-회수)
+      - [FR-FILE-004-3: 선제적 공간 회수 (임계치 기반)](#fr-file-004-3-선제적-공간-회수-임계치-기반)
+      - [FR-FILE-004-4: 부분 쓰기 데이터 보존](#fr-file-004-4-부분-쓰기-데이터-보존)
       - [FR-FILE-005: 파일 동기화 (fsync)](#fr-file-005-파일-동기화-fsync)
       - [FR-FILE-006: 파일 이름 변경 (rename)](#fr-file-006-파일-이름-변경-rename)
       - [FR-FILE-007: 파일 삭제](#fr-file-007-파일-삭제)
@@ -45,10 +49,17 @@
       - [FR-DIR-003 디렉토리 생성](#fr-dir-003-디렉토리-생성)
       - [FR-DIR-004 디렉토리 삭제](#fr-dir-004-디렉토리-삭제)
       - [FR-META-001 메타데이터 조회](#fr-meta-001-메타데이터-조회)
+    - [3.2.3 Mount/Unmount Operations (마운트 연산)](#323-mountunmount-operations-마운트-연산)
+      - [FR-MNT-001: 마운트 시 파일시스템 복원](#fr-mnt-001-마운트-시-파일시스템-복원)
+      - [FR-MNT-002: 마운트 시 미완료 쓰기 무시](#fr-mnt-002-마운트-시-미완료-쓰기-무시)
+    - [3.2.4 Storage Management (저장 공간 관리)](#324-storage-management-저장-공간-관리)
+      - [FR-STORE-001: 저장 공간 조회](#fr-store-001-저장-공간-조회)
+      - [FR-STORE-002: 저장 공간 소진 시 오류 반환](#fr-store-002-저장-공간-소진-시-오류-반환)
   - [3.3 Usability requirements (사용성 요구사항)](#33-usability-requirements-사용성-요구사항)
   - [3.4 Performance requirements (성능 요구사항)](#34-performance-requirements-성능-요구사항)
   - [3.5 Design constraints (설계 제약사항)](#35-design-constraints-설계-제약사항)
     - [OTH-LEG-001: 오픈소스 라이선스](#oth-leg-001-오픈소스-라이선스)
+    - [OTH-IMPL-001: 인메모리 쓰기 버퍼 미사용](#oth-impl-001-인메모리-쓰기-버퍼-미사용)
   - [3.6 Software system attributes (소프트웨어 시스템 속성)](#36-software-system-attributes-소프트웨어-시스템-속성)
     - [3.6.1 Reliability and Availability (신뢰성 및 가용성)](#361-reliability-and-availability-신뢰성-및-가용성)
       - [NFR-REL-001: 데이터 손실 방지](#nfr-rel-001-데이터-손실-방지)
@@ -71,6 +82,8 @@
   - [5.3 Glossary (용어집)](#53-glossary-용어집)
   - [5.4 Use Cases and Scenarios (사용 사례)](#54-use-cases-and-scenarios-사용-사례)
     - [UC-001: 파일 생성 및 쓰기 (정상 시나리오)](#uc-001-파일-생성-및-쓰기-정상-시나리오)
+    - [UC-002: 저장 공간 부족 시 자동 공간 회수](#uc-002-저장-공간-부족-시-자동-공간-회수)
+    - [UC-003: 크래시 후 재마운트 복원](#uc-003-크래시-후-재마운트-복원)
   - [5.5 Requirements Traceability Matrix (요구사항 추적 매트릭스)](#55-requirements-traceability-matrix-요구사항-추적-매트릭스)
   - [5.6 Supporting Diagrams (지원 다이어그램)](#56-supporting-diagrams-지원-다이어그램)
     - [Diagram 1: 시스템 아키텍처](#diagram-1-시스템-아키텍처)
@@ -325,6 +338,7 @@ umount <mount_point>
   - `readdir`: FR-DIR-002과 매핑
   - `mkdir`: FR-DIR-003과 매핑
   - `rmdir`: FR-DIR-004과 매핑
+  - `statfs`: FR-STORE-001과 매핑
 
 **Priority**: Critical
 
@@ -363,6 +377,60 @@ umount <mount_point>
 **Priority**: Critical
 
 **Verification**: 단위 테스트, 통합 테스트
+
+---
+
+#### FR-FILE-004-1: 대용량 파일 쓰기 지원
+
+**Description**: 시스템은 단일 파일에 대해 최소 64KB 이상의 데이터를 저장하고 읽을 수 있어야 한다. 데이터 양이 첫 번째 파일 저장 블록의 용량을 초과할 경우, 추가 블록을 할당하여 연속적으로 저장해야 한다.
+
+**Acceptance Criteria**:
+- 64KB 크기의 데이터를 write → fsync → read 시 읽은 데이터와 쓴 데이터가 바이트 단위로 일치한다.
+
+**Priority**: Critical
+
+**Verification**: 단위 테스트 (TC-FILE-004-1)
+
+---
+
+#### FR-FILE-004-2: 공간 부족 시 자동 공간 회수
+
+**Description**: 시스템은 전체 저장 용량이 소진되지 않은 상태에서 개별 저장 단위(블록)의 공간 부족을 이유로 쓰기 연산이 실패해서는 안 된다. 시스템은 자동으로 회수 가능한 공간을 확보하여 쓰기를 완료해야 하며, 이 과정에서 이전에 읽을 수 있던 파일 데이터는 보존되어야 한다.
+
+**Acceptance Criteria**:
+- 특정 저장 블록이 가득 찬 상태에서 해당 파일에 추가 write → fsync → 성공(반환값 0)
+- 공간 회수 전후로 기존 파일의 read 결과가 동일하다.
+
+**Priority**: Critical
+
+**Verification**: 단위 테스트 (TC-GC-001)
+
+---
+
+#### FR-FILE-004-3: 선제적 공간 회수 (임계치 기반)
+
+**Description**: 시스템의 여유 저장 블록 수가 내부 임계치 이하로 감소하면, 시스템은 다음 쓰기 연산 전에 자동으로 회수 가능한 블록을 확보해야 한다. 이 과정에서 이전에 읽을 수 있던 파일 데이터는 변경되어서는 안 된다.
+
+**Acceptance Criteria**:
+- 여유 블록이 임계치 근처인 상태에서 write → fsync → 성공(반환값 0)
+- 선제적 공간 회수 전후로 기존 파일의 read 결과가 동일하다.
+
+**Priority**: Critical
+
+**Verification**: 단위 테스트 (TC-GC-002)
+
+---
+
+#### FR-FILE-004-4: 부분 쓰기 데이터 보존
+
+**Description**: write() 요청 범위가 저장 최소 단위(페이지)의 경계와 정렬되지 않거나 최소 단위보다 작은 경우, 해당 파일에서 요청한 범위 외에 위치한 기존 데이터는 해당 write() 완료 후에도 변경되지 않아야 한다.
+
+**Acceptance Criteria**:
+- 파일의 특정 오프셋에 1B를 write 한 후 read 시, 쓴 바이트는 새 값이고 나머지 바이트는 write 이전 값과 동일하다.
+
+**Priority**: Critical
+
+**Verification**: 단위 테스트 (TC-FILE-004-4)
 
 ---
 
@@ -424,6 +492,63 @@ UFFS 파일시스템은 디렉토리 구조가 스캔 기반 메타레코드로 
 **Description**: 시스템은 파일, 폴더의 메타데이터를 조회할 수 있다. (권한, 링크, 파일의 길이)
 **Priority**: Medium
 
+---
+
+### 3.2.3 Mount/Unmount Operations (마운트 연산)
+
+#### FR-MNT-001: 마운트 시 파일시스템 복원
+
+**Description**: 시스템은 마운트 시 플래시 저장소를 스캔하여 이전에 성공적으로 동기화(fsync)가 완료된 파일 및 디렉토리 데이터를 복원해야 한다. 마운트 완료 후 사용자는 이전 세션에서 fsync가 완료된 파일을 읽을 수 있어야 한다.
+
+**Acceptance Criteria**:
+- 파일 생성 → fsync → 파일시스템 프로세스 종료 → 재마운트 → 동일 파일 read 성공
+
+**Priority**: Critical
+
+**Verification**: 통합 테스트 (TC-MNT-001)
+
+---
+
+#### FR-MNT-002: 마운트 시 미완료 쓰기 무시
+
+**Description**: 시스템은 마운트 시 fsync 완료 이전에 중단된 쓰기 작업의 결과를 유효한 파일 데이터로 인식하지 않아야 한다. 마운트 후 해당 쓰기가 관측되더라도 그 내용은 정의되지 않으며 시스템은 이로 인한 파일시스템 불일치 상태가 되어서는 안 된다.
+
+**Rationale**: 쓰기 중단(전원 차단 등)으로 인해 부분적으로 기록된 데이터가 유효한 데이터로 취급되면 파일시스템 일관성이 깨진다. 미완료 쓰기를 무시하는 것이 크래시 정합성의 핵심 메커니즘이다.
+
+**Acceptance Criteria**:
+- 파일 write 직후 (fsync 이전) 프로세스 강제 종료 → 재마운트 → 해당 write 이전 상태가 관측되거나 파일시스템이 정상 동작 상태를 유지한다.
+
+**Priority**: Critical
+
+**Verification**: Crash consistency 테스트 (TC-CRASH-MNT-001)
+
+---
+
+### 3.2.4 Storage Management (저장 공간 관리)
+
+#### FR-STORE-001: 저장 공간 조회
+
+**Description**: 시스템은 마운트된 파일시스템의 총 저장 용량과 현재 사용 가능한 여유 용량을 조회하는 기능을 제공해야 한다. 이 정보는 표준 POSIX 인터페이스(statvfs)를 통해 접근할 수 있어야 한다.
+
+**Priority**: Medium
+
+**Verification**: 단위 테스트 — statvfs() 호출 후 반환된 여유 블록 수가 실제 파일 생성 가능 횟수와 일관성이 있음을 확인
+
+---
+
+#### FR-STORE-002: 저장 공간 소진 시 오류 반환
+
+**Description**: 시스템의 저장 공간이 완전히 소진된 상태에서 write() 또는 파일 생성 요청이 발생하면 시스템은 ENOSPC(저장 공간 부족) 오류를 반환해야 한다. 이 상황에서 기존에 존재하던 파일 데이터는 손상되지 않아야 한다.
+
+**Acceptance Criteria**:
+- 저장 공간이 100% 사용된 상태에서 write() → errno == ENOSPC
+- ENOSPC 반환 이후 기존 파일 read → 이전 데이터와 동일
+
+**Priority**: High
+
+**Verification**: 단위 테스트 (TC-STORE-002)
+
+---
 
 ## 3.3 Usability requirements (사용성 요구사항)
 
@@ -453,6 +578,16 @@ UFFS 파일시스템은 디렉토리 구조가 스캔 기반 메타레코드로 
 - 저작권 표시
 
 **Priority**: Critical
+
+---
+
+### OTH-IMPL-001: 인메모리 쓰기 버퍼 미사용
+
+**Description**: 시스템은 파일 데이터를 위한 인메모리 쓰기 버퍼(dirty page cache)를 사용하지 않는다. write() 호출 시 데이터는 즉시 영구 저장소에 기록된다.
+
+**Rationale**: 인메모리 버퍼를 제거하면 fsync() 없이도 단일 write 호출의 플래시 반영 시점을 예측 가능하게 만들며, 임베디드 환경의 제한된 메모리 사용에 부합한다. 단, 파일 메타데이터(크기 등)의 내구성 보장 경계는 FR-FILE-005(fsync)에 의해 정의된다.
+
+**Priority**: High
 
 ---
 
@@ -640,6 +775,11 @@ write/fsync 연산의 내구성 검증 시, 검증 오라클(기준값)은 원�
 | **UFFS (Ultra-low-cost Flash File System)** | NAND 플래시용 경량 파일시스템 |
 | **VFS (Virtual File System)** | 가상 파일시스템. 리눅스 커널의 파일시스템 추상화 계층 |
 | **Write-Ahead Logging (WAL)** | 선행 기록 로깅. 데이터 변경 전에 로그를 기록하여 복구를 보장하는 기법 |
+| **헤더 블록 (Header Block)** | UFFS에서 파일 당 1개 할당되는 블록. 파일 메타데이터(이름, 크기 등)와 초기 파일 데이터를 함께 저장 |
+| **데이터 블록 (Data Block)** | 헤더 블록 용량을 초과한 파일 데이터를 저장하기 위해 추가 할당되는 블록 |
+| **Victim Block** | 가비지 컬렉션 시 회수 대상으로 선정된 블록. 회수 가능한 공간(무효 데이터)이 가장 많은 블록을 선정 |
+| **Garbage Collection (GC)** | 가비지 컬렉션. 무효화된 저장 공간을 회수하여 새 쓰기를 위한 여유 공간을 확보하는 작업 |
+| **Write Durability Boundary** | 쓰기 내구성 경계. 시스템이 데이터 영속성을 보장하는 시작 시점. 본 시스템에서는 fsync() 성공 반환 시점 |
 
 ## 5.4 Use Cases and Scenarios (사용 사례)
 
@@ -655,9 +795,9 @@ write/fsync 연산의 내구성 검증 시, 검증 오라클(기준값)은 원�
 1. 애플리케이션이 `open("/mnt/uffs/test.txt", O_CREAT|O_WRONLY)` 호출
 2. 시스템이 새 파일 생성 (FR-FILE-002)
 3. 애플리케이션이 `write(fd, data, size)` 호출
-4. 시스템이 데이터를 메모리 버퍼에 기록 (FR-FILE-004)
+4. 시스템이 데이터를 영구 저장소에 기록 (FR-FILE-004, OTH-IMPL-001)
 5. 애플리케이션이 `fsync(fd)` 호출
-6. 시스템이 데이터를 플래시에 동기화 (FR-FILE-005)
+6. 시스템이 파일 메타데이터(크기 등)를 플래시에 동기화하여 내구성 보장 (FR-FILE-005)
 7. 애플리케이션이 `rename("/mnt/uffs/test.txt", "/mnt/uffs/final.txt")` 호출
 8. 파일 이름 성공적으로 변경 (FR-FILE-006)
 9. 애플리케이션이 `fsync(dirfd)` 호출
@@ -671,6 +811,62 @@ write/fsync 연산의 내구성 검증 시, 검증 오라클(기준값)은 원�
 
 ---
 
+### UC-002: 저장 공간 부족 시 자동 공간 회수
+
+**Actor**: 사용자 애플리케이션
+
+**Preconditions**:
+- 파일시스템이 마운트됨
+- 저장 공간이 거의 소진된 상태 (여유 블록이 임계치 이하)
+
+**Main Flow**:
+1. 애플리케이션이 기존 파일에 `write(fd, data, size)` 호출
+2. 시스템이 내부적으로 가용 공간 부족을 감지
+3. 시스템이 자동으로 회수 가능한 공간을 확보 (FR-FILE-004-2, FR-FILE-004-3)
+4. 시스템이 쓰기를 완료하고 성공 반환
+5. 애플리케이션이 `fsync(fd)` 호출
+6. 시스템이 메타데이터 동기화 완료 (FR-FILE-005)
+
+**Alternative Flow** (저장 공간 완전 소진):
+- 3단계에서 회수 가능한 공간이 없으면 시스템이 ENOSPC 반환 (FR-STORE-002)
+
+**Postconditions**:
+- 쓰기 성공 시: write한 데이터가 저장되고 기존 파일 데이터는 보존됨
+- ENOSPC 시: 기존 파일 데이터는 변경되지 않음
+
+**Related Requirements**: FR-FILE-004-2, FR-FILE-004-3, FR-FILE-005, FR-STORE-002
+
+---
+
+### UC-003: 크래시 후 재마운트 복원
+
+**Actor**: 시스템 (자동)
+
+**Preconditions**:
+- 파일시스템이 이전에 마운트되어 사용 중이었음
+- 파일시스템 프로세스가 비정상 종료됨 (전원 차단, SIGKILL 등)
+
+**Main Flow** (fsync 이전 크래시):
+1. 크래시 이전: 애플리케이션이 `write(fd, data)` 완료, `fsync()` 미호출
+2. 크래시 발생
+3. 재마운트 시 시스템이 플래시 저장소 스캔 (FR-MNT-001)
+4. 시스템이 미완료 쓰기를 유효한 데이터로 인식하지 않음 (FR-MNT-002)
+5. 파일이 write 이전 상태 또는 파일시스템이 일관된 상태로 복원됨
+
+**Alternative Flow** (fsync 이후 크래시):
+1. 크래시 이전: `write(fd, data)` + `fsync()` 모두 완료
+2. 크래시 발생
+3. 재마운트 시 시스템이 fsync 완료된 데이터를 복원 (FR-MNT-001)
+4. 파일 read 시 fsync 시점의 데이터가 반환됨 (FR-FILE-005)
+
+**Postconditions**:
+- 파일시스템이 일관된 상태로 마운트됨
+- fsync 완료된 데이터는 보존, 미완료 데이터는 관측되지 않음
+
+**Related Requirements**: FR-MNT-001, FR-MNT-002, FR-FILE-005, NFR-REL-001
+
+---
+
 ## 5.5 Requirements Traceability Matrix (요구사항 추적 매트릭스)
 
 | 요구사항 ID | 요구사항 이름 | 우선순위 | 검증 방법 | 테스트 케이스 ID | 상태 |
@@ -679,6 +875,10 @@ write/fsync 연산의 내구성 검증 시, 검증 오라클(기준값)은 원�
 | FR-FILE-002 | 파일 생성 | Critical | Unit Test | TC-FILE-002 | TBD |
 | FR-FILE-003 | 파일 읽기 | Critical | Unit Test | TC-FILE-003 | TBD |
 | FR-FILE-004 | 파일 쓰기 | Critical | Unit Test | TC-FILE-004 | TBD |
+| FR-FILE-004-1 | 대용량 파일 쓰기 지원 | Critical | Unit Test | TC-FILE-004-1 | TBD |
+| FR-FILE-004-2 | 공간 부족 시 자동 공간 회수 | Critical | Unit Test | TC-GC-001 | TBD |
+| FR-FILE-004-3 | 선제적 공간 회수 (임계치 기반) | Critical | Unit Test | TC-GC-002 | TBD |
+| FR-FILE-004-4 | 부분 쓰기 데이터 보존 | Critical | Unit Test | TC-FILE-004-4 | TBD |
 | FR-FILE-005 | 파일 동기화 (fsync) | Critical | Crash Test | TC-CRASH-005 | TBD |
 | FR-FILE-006 | 파일 이름 변경 (rename) | High | Unit Test | TC-FILE-006 | TBD |
 | FR-FILE-007 | 파일 삭제 | Medium | Unit Test | TC-FILE-007 | TBD |
@@ -687,7 +887,12 @@ write/fsync 연산의 내구성 검증 시, 검증 오라클(기준값)은 원�
 | FR-DIR-003 | 디렉토리 생성 | High | Unit Test | TC-DIR-003 | TBD |
 | FR-DIR-004 | 디렉토리 삭제 | Medium | Unit Test | TC-DIR-004 | TBD |
 | FR-META-001 | 메타데이터 조회 | Medium | Unit Test | TC-META-001 | TBD |
+| FR-MNT-001 | 마운트 시 파일시스템 복원 | Critical | 통합 테스트 | TC-MNT-001 | TBD |
+| FR-MNT-002 | 마운트 시 미완료 쓰기 무시 | Critical | Crash Test | TC-CRASH-MNT-001 | TBD |
+| FR-STORE-001 | 저장 공간 조회 | Medium | Unit Test | TC-STORE-001 | TBD |
+| FR-STORE-002 | 저장 공간 소진 시 오류 반환 | High | Unit Test | TC-STORE-002 | TBD |
 | **NFR-REL-001** | **데이터 손실 방지** | **Critical** | **Durability Test** | **TC-REL-001** | **TBD** |
+
 **Note**: TBD = To Be Determined (구현 단계에서 결정)
 
 **상태 값**:
@@ -739,8 +944,9 @@ write/fsync 연산의 내구성 검증 시, 검증 오라클(기준값)은 원�
 
 | 버전 | 날짜 | 작성자 | 변경 내용 |
 |-----|------|--------|----------|
-| 1.0 | 2026.02.22 | 임재형 | 초안 작성 |
-
+| 1.0 | 2026.03.04 | 임재형 | 초안 작성 |
+| 1.1 | 2026.03.11 | 임재형 | 1차 구현 기반 파일 쓰기 요구사항 추가 (FR-FILE-004-1~6 초안) |
+| 1.2 | 2026.03.11 | 임재형 | IEEE 29148 준거 보완: FR-FILE-004-1~4 형식 정규화; FR-MNT-001~002, FR-STORE-001~002 신규 추가; OTH-IMPL-001 설계 제약 추가; UC-002~003, RTM 갱신, 용어집 보완 |
 
 ---
 
